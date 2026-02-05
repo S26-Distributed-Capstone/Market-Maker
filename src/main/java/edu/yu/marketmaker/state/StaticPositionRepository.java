@@ -10,15 +10,15 @@ import org.springframework.stereotype.Component;
 import edu.yu.marketmaker.model.Position;
 
 @Component
-public class StaticPoitionRepository implements PositionRepository {
+public class StaticPositionRepository implements PositionRepository {
 
     private final Map<String, Position> map;
 
-    public StaticPoitionRepository(Map<String, Position> map) {
+    public StaticPositionRepository(Map<String, Position> map) {
         this.map = new HashMap<>(map);
     }
 
-    public StaticPoitionRepository() {
+    public StaticPositionRepository() {
         this(generatePositions(new Random(5678)));
     }
 
