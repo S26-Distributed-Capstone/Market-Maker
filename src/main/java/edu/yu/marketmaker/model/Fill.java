@@ -1,9 +1,5 @@
 package edu.yu.marketmaker.model;
 
-enum Side{
-    buy, sell
-}
-
 /**
  * A fill is the result of a successful execution against a quote.
  * @param orderId
