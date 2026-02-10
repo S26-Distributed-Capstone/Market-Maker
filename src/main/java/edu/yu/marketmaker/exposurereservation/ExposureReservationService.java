@@ -1,8 +1,6 @@
 package edu.yu.marketmaker.exposurereservation;
 
-import edu.yu.marketmaker.model.ExposureState;
-import edu.yu.marketmaker.model.ReservationRequest;
-import edu.yu.marketmaker.model.ReservationResponse;
+import edu.yu.marketmaker.model.*;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,21 +30,22 @@ public class ExposureReservationService {
     public synchronized ReservationResponse createReservation(ReservationRequest req) {
         long limit = capacityConfig.getOrDefault(req.symbol(), DEFAULT_CAPACITY);
         long currentUsage = repo.findAll().stream()
-                .filter(r -> r.getSymbol().equals(req.symbol()))
-                .mapToLong(Reservation::getGranted)
+                .filter(r -> r.symbol().equals(req.symbol()))
+                .mapToLong(Reservation::granted)
                 .sum();
 
         long available = Math.max(0, limit - currentUsage);
         long granted = Math.min(req.quantity(), available);
 
-        Reservation.Status status;
-        if (granted == 0) status = Reservation.Status.DENIED;
-        else if (granted < req.quantity()) status = Reservation.Status.PARTIAL;
-        else status = Reservation.Status.GRANTED;
+        ReservationStatus status;
+        if (granted == 0 && req.quantity() > 0) status = ReservationStatus.DENIED;
+        else if (granted < req.quantity()) status = ReservationStatus.PARTIAL;
+        else status = ReservationStatus.GRANTED;
 
-        Reservation r = new Reservation(req.symbol(), req.quantity(), granted, status);
+        Reservation r = new Reservation(UUID.randomUUID(), req.symbol(), req.quantity(), granted, status);
         repo.save(r);
-        return new ReservationResponse(r.getId(), r.getStatus(), r.getGranted());
+
+        return new ReservationResponse(r.id(), r.status(), r.granted());
     }
 
     /**
@@ -61,7 +60,7 @@ public class ExposureReservationService {
      */
     public synchronized long applyFill(UUID id, long filledQty) {
         Reservation r = repo.findById(id).orElseThrow(() -> new RuntimeException("Reservation not found"));
-        return r.reduceGrantOnFill(filledQty);
+        return reduceGrantOnFill(r, filledQty);
     }
 
     /**
@@ -74,7 +73,42 @@ public class ExposureReservationService {
      */
     public synchronized long release(UUID id) {
         Reservation r = repo.findById(id).orElseThrow(() -> new RuntimeException("Reservation not found"));
-        return r.releaseRemaining();
+        return releaseRemaining(r);
+    }
+
+    /**
+     * Reduces the granted (reserved) amount based on a fill.
+     * If 100 units are reserved and 50 are filled, the reservation drops to 50.
+     *
+     * @param r The reservation to modify.
+     * @param fillQty The quantity filled.
+     * @return The amount of capacity to free (min of current granted and fill quantity).
+     */
+    private long reduceGrantOnFill(Reservation r, long fillQty) {
+        long toFree = Math.min(r.granted(), fillQty);
+        long newGranted = r.granted() - toFree;
+
+        // Update record
+        Reservation updated = new Reservation(r.id(), r.symbol(), r.requested(), newGranted, r.status());
+        repo.save(updated);
+
+        return toFree;
+    }
+
+    /**
+     * Sets the granted amount to zero, effectively releasing the entire reservation.
+     *
+     * @param r The reservation to release.
+     * @return The amount of capacity that was freed.
+     */
+    private long releaseRemaining(Reservation r) {
+        long toFree = r.granted();
+
+        // Update record
+        Reservation updated = new Reservation(r.id(), r.symbol(), r.requested(), 0, r.status());
+        repo.save(updated);
+
+        return toFree;
     }
 
     /**
@@ -83,9 +117,9 @@ public class ExposureReservationService {
      * @return Snapshot of usage, capacity, and active count.
      */
     public ExposureState getExposureState() {
-        long totalUsage = repo.findAll().stream().mapToLong(Reservation::getGranted).sum();
-        int count = (int) repo.findAll().stream().filter(r -> r.getGranted() > 0).count();
-        // Assuming single symbol for simple debugging or sum of all default capacities
-        return new ExposureState(totalUsage, DEFAULT_CAPACITY, count);
+        long totalUsage = repo.findAll().stream().mapToLong(Reservation::granted).sum();
+        int activeCount = (int) repo.findAll().stream().filter(r -> r.granted() > 0).count();
+        // Summing default capacity for illustration, essentially assuming 1 symbol or simplified view
+        return new ExposureState(totalUsage, DEFAULT_CAPACITY, activeCount);
     }
 }

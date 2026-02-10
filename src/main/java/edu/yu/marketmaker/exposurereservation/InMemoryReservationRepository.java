@@ -1,18 +1,15 @@
 package edu.yu.marketmaker.exposurereservation;
 
+import edu.yu.marketmaker.model.Reservation;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * In-memory implementation of the ReservationRepository using a ConcurrentHashMap.
- * Suitable for testing or single-instance applications without persistence requirements.
- */
 public class InMemoryReservationRepository implements ReservationRepository {
     private final Map<UUID, Reservation> store = new ConcurrentHashMap<>();
 
     @Override
     public void save(Reservation reservation) {
-        store.put(reservation.getId(), reservation);
+        store.put(reservation.id(), reservation);
     }
 
     @Override
