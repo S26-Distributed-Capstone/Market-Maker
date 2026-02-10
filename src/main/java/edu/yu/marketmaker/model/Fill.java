@@ -1,5 +1,7 @@
 package edu.yu.marketmaker.model;
 
+import java.util.UUID;
+
 /**
  * A fill is the result of a successful execution against a quote.
  * @param orderId
@@ -11,5 +13,6 @@ package edu.yu.marketmaker.model;
  * @param createdAt timestamp
  */
 
-public record Fill(long orderId, String symbol, Side side, int quantity, double price, long quoteId, long createdAt) {
+public record Fill(UUID orderId, String symbol, Side side, int quantity, double price, UUID quoteId, long createdAt) {
+
 }

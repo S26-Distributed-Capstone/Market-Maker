@@ -83,7 +83,7 @@ public class ExternalOrderPublisher {
      */
     private void generateRandomOrder(String symbol) {
         // Random buy or sell
-        Side side = random.nextBoolean() ? Side.buy : Side.sell;
+        Side side = random.nextBoolean() ? Side.BUY : Side.SELL;
 
         // Random quantity between 1 and 20
         int quantity = 1 + random.nextInt(20);
