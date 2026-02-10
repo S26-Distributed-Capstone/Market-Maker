@@ -24,25 +24,25 @@ public class ExposureReservationService {
      * Creates a new exposure reservation.
      * Checks current usage against limits and grants full, partial, or no capacity.
      *
-     * @param req The reservation request details.
+     * @param quote The requested quote.
      * @return The response containing the reservation ID and the actual granted quantity.
      */
-    public synchronized ReservationResponse createReservation(ReservationRequest req) {
-        long limit = capacityConfig.getOrDefault(req.symbol(), DEFAULT_CAPACITY);
+    public synchronized ReservationResponse createReservation(Quote quote) {
+        long limit = capacityConfig.getOrDefault(quote.symbol(), DEFAULT_CAPACITY);
         long currentUsage = repo.findAll().stream()
-                .filter(r -> r.symbol().equals(req.symbol()))
+                .filter(r -> r.symbol().equals(quote.symbol()))
                 .mapToLong(Reservation::granted)
                 .sum();
 
         long available = Math.max(0, limit - currentUsage);
-        long granted = Math.min(req.quantity(), available);
+        long granted = Math.min(quote.askQuantity(), available);
 
         ReservationStatus status;
-        if (granted == 0 && req.quantity() > 0) status = ReservationStatus.DENIED;
-        else if (granted < req.quantity()) status = ReservationStatus.PARTIAL;
+        if (granted == 0 && quote.askQuantity() > 0) status = ReservationStatus.DENIED;
+        else if (granted < quote.askQuantity()) status = ReservationStatus.PARTIAL;
         else status = ReservationStatus.GRANTED;
 
-        Reservation r = new Reservation(UUID.randomUUID(), req.symbol(), req.quantity(), granted, status);
+        Reservation r = new Reservation(UUID.randomUUID(), quote.symbol(), quote.askQuantity(), granted, status);
         repo.save(r);
 
         return new ReservationResponse(r.id(), r.status(), r.granted());

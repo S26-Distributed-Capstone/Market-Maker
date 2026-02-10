@@ -24,12 +24,12 @@ public class ExposureReservationAPI {
      * POST /reservations
      * Requests exposure capacity for a quote.
      *
-     * @param request The reservation request containing symbol and quantity.
+     * @param quote The quote containing symbol and quantity.
      * @return A ReservationResponse with the granted quantity and status (GRANTED, PARTIAL, DENIED).
      */
     @PostMapping("/reservations")
-    public ResponseEntity<ReservationResponse> createReservation(@RequestBody ReservationRequest request) {
-        return ResponseEntity.ok(service.createReservation(request));
+    public ResponseEntity<ReservationResponse> createReservation(@RequestBody Quote quote) {
+        return ResponseEntity.ok(service.createReservation(quote));
     }
 
     /**
@@ -38,18 +38,18 @@ public class ExposureReservationAPI {
      * Reduces the reserved exposure by the filled amount.
      *
      * @param id The UUID of the reservation.
-     * @param request The request containing the filled quantity.
+     * @param requestedQuantity The filled quantity.
      * @return A response indicating the capacity that was freed up by this fill.
      */
     @PostMapping("/reservations/{id}/apply-fill")
-    public ResponseEntity<FreedCapacityResponse> applyFill(@PathVariable UUID id, @RequestBody ApplyFillRequest request) {
-        long freed = service.applyFill(id, request.filledQuantity());
+    public ResponseEntity<FreedCapacityResponse> applyFill(@PathVariable UUID id, @RequestBody long requestedQuantity) {
+        long freed = service.applyFill(id, requestedQuantity);
         return ResponseEntity.ok(new FreedCapacityResponse(freed));
     }
 
     /**
      * POST /reservations/{id}/release
-     * Manually releases a reservation, typically used when a quote is replaced or cancelled
+     * Manually releases a reservation, typically used when a quote is replaced or canceled
      * without being filled.
      *
      * @param id The UUID of the reservation to release.
