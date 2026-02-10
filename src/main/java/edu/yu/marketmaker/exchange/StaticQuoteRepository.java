@@ -29,6 +29,7 @@ public class StaticQuoteRepository implements QuoteRepository {
 
     @Override
     public void putQuote(Quote quote) {
+        map.put(quote.symbol(), quote);
     }
 
     private static Map<String, Quote> generateQuotes(Random random) {
