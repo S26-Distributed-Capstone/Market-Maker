@@ -1,5 +1,9 @@
 package edu.yu.marketmaker.exposurereservation;
 
+import edu.yu.marketmaker.model.ExposureState;
+import edu.yu.marketmaker.model.ReservationRequest;
+import edu.yu.marketmaker.model.ReservationResponse;
+
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -26,21 +30,21 @@ public class ExposureReservationService {
      * @return The response containing the reservation ID and the actual granted quantity.
      */
     public synchronized ReservationResponse createReservation(ReservationRequest req) {
-        long limit = capacityConfig.getOrDefault(req.getSymbol(), DEFAULT_CAPACITY);
+        long limit = capacityConfig.getOrDefault(req.symbol(), DEFAULT_CAPACITY);
         long currentUsage = repo.findAll().stream()
-                .filter(r -> r.getSymbol().equals(req.getSymbol()))
+                .filter(r -> r.getSymbol().equals(req.symbol()))
                 .mapToLong(Reservation::getGranted)
                 .sum();
 
         long available = Math.max(0, limit - currentUsage);
-        long granted = Math.min(req.getQuantity(), available);
+        long granted = Math.min(req.quantity(), available);
 
         Reservation.Status status;
         if (granted == 0) status = Reservation.Status.DENIED;
-        else if (granted < req.getQuantity()) status = Reservation.Status.PARTIAL;
+        else if (granted < req.quantity()) status = Reservation.Status.PARTIAL;
         else status = Reservation.Status.GRANTED;
 
-        Reservation r = new Reservation(req.getSymbol(), req.getQuantity(), granted, status);
+        Reservation r = new Reservation(req.symbol(), req.quantity(), granted, status);
         repo.save(r);
         return new ReservationResponse(r.getId(), r.getStatus(), r.getGranted());
     }

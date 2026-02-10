@@ -1,5 +1,6 @@
 package edu.yu.marketmaker.exposurereservation;
 
+import edu.yu.marketmaker.model.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -42,7 +43,7 @@ public class ExposureReservationAPI {
      */
     @PostMapping("/reservations/{id}/apply-fill")
     public ResponseEntity<FreedCapacityResponse> applyFill(@PathVariable UUID id, @RequestBody ApplyFillRequest request) {
-        long freed = service.applyFill(id, request.getFilledQuantity());
+        long freed = service.applyFill(id, request.filledQuantity());
         return ResponseEntity.ok(new FreedCapacityResponse(freed));
     }
 
