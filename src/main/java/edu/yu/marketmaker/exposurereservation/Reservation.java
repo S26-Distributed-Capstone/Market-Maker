@@ -2,6 +2,10 @@ package edu.yu.marketmaker.exposurereservation;
 
 import java.util.UUID;
 
+/**
+ * Represents a specific reservation of exposure capacity for a symbol.
+ * Tracks the amount requested and the amount currently granted (reserved).
+ */
 public class Reservation {
     public enum Status { GRANTED, PARTIAL, DENIED }
 
@@ -19,6 +23,13 @@ public class Reservation {
         this.status = status;
     }
 
+    /**
+     * Reduces the granted (reserved) amount based on a fill.
+     * If 100 units are reserved and 50 are filled, the reservation drops to 50.
+     *
+     * @param fillQty The quantity filled.
+     * @return The amount of capacity to free (min of current granted and fill quantity).
+     */
     public long reduceGrantOnFill(long fillQty) {
         // If we filled X, we no longer need to reserve X.
         // We free min(granted, fillQty). Usually granted >= fillQty unless overfilled.
@@ -27,6 +38,11 @@ public class Reservation {
         return toFree;
     }
 
+    /**
+     * Sets the granted amount to zero, effectively releasing the entire reservation.
+     *
+     * @return The amount of capacity that was freed.
+     */
     public long releaseRemaining() {
         long freed = this.granted;
         this.granted = 0;
@@ -38,4 +54,3 @@ public class Reservation {
     public long getGranted() { return granted; }
     public Status getStatus() { return status; }
 }
-

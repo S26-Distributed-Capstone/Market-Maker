@@ -2,6 +2,9 @@ package edu.yu.marketmaker.exposurereservation;
 
 import java.util.UUID;
 
+/**
+ * DTO representing a request to reserve exposure capacity.
+ */
 class ReservationRequest {
     private String symbol;
     private long quantity;
@@ -11,6 +14,9 @@ class ReservationRequest {
     public void setQuantity(long quantity) { this.quantity = quantity; }
 }
 
+/**
+ * DTO representing the response to a reservation request.
+ */
 class ReservationResponse {
     private UUID id;
     private Reservation.Status status;
@@ -26,18 +32,27 @@ class ReservationResponse {
     public long getGrantedQuantity() { return grantedQuantity; }
 }
 
+/**
+ * DTO representing a request to apply a fill to a reservation.
+ */
 class ApplyFillRequest {
     private long filledQuantity;
     public long getFilledQuantity() { return filledQuantity; }
     public void setFilledQuantity(long filledQuantity) { this.filledQuantity = filledQuantity; }
 }
 
+/**
+ * DTO representing the capacity freed by an operation.
+ */
 class FreedCapacityResponse {
     private long freedCapacity;
     public FreedCapacityResponse(long freedCapacity) { this.freedCapacity = freedCapacity; }
     public long getFreedCapacity() { return freedCapacity; }
 }
 
+/**
+ * DTO representing the global exposure state snapshot.
+ */
 class ExposureState {
     private long currentUsage;
     private long totalCapacity;
@@ -52,4 +67,3 @@ class ExposureState {
     public long getTotalCapacity() { return totalCapacity; }
     public int getActiveReservations() { return activeReservations; }
 }
-
