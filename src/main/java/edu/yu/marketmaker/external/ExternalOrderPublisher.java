@@ -1,9 +1,10 @@
 package edu.yu.marketmaker.external;
 
+import edu.yu.marketmaker.model.ExternalOrder;
+import edu.yu.marketmaker.model.Side;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.math.BigDecimal;
 import java.util.Random;
 import java.util.UUID;
 import java.util.List;
@@ -36,44 +37,22 @@ public class ExternalOrderPublisher {
     }
 
     /**
-     * Submit a buy order to the Exchange.
+     * Submit an order to the Exchange.
      * Calls POST /orders on Exchange API.
      *
-     * @param symbol The symbol to buy (e.g., "AAPL")
-     * @param quantity Number of units to buy
-     * @param limitPrice Maximum price willing to pay
+     * @param order The ExternalOrder to submit
      * @return orderId if accepted, null if rejected
      */
-    public String submitBuyOrder(String symbol, int quantity, BigDecimal limitPrice) {
+    public String submitOrder(ExternalOrder order) {
         String orderId = UUID.randomUUID().toString();
 
-        logger.info("Submitting BUY order: {} x {} @ {}", symbol, quantity, limitPrice);
+        logger.info("Submitting {} order: {} x {} @ {}",
+                order.side(), order.symbol(), order.quantity(), order.limitPrice());
 
         // TODO: Implement HTTP POST to {exchangeBaseUrl}/orders
-        // Request body: {"order_id": orderId, "symbol": symbol, "side": "buy",
-        //                "quantity": quantity, "limit_price": limitPrice}
-        // Handle response: 200 OK (filled), 202 Accepted (partial), 400 Rejected
-
-        throw new UnsupportedOperationException("Not implemented yet");
-    }
-
-    /**
-     * Submit a sell order to the Exchange.
-     * Calls POST /orders on Exchange API.
-     *
-     * @param symbol The symbol to sell (e.g., "MSFT")
-     * @param quantity Number of units to sell
-     * @param limitPrice Minimum price willing to accept
-     * @return orderId if accepted, null if rejected
-     */
-    public String submitSellOrder(String symbol, int quantity, BigDecimal limitPrice) {
-        String orderId = UUID.randomUUID().toString();
-
-        logger.info("Submitting SELL order: {} x {} @ {}", symbol, quantity, limitPrice);
-
-        // TODO: Implement HTTP POST to {exchangeBaseUrl}/orders
-        // Request body: {"order_id": orderId, "symbol": symbol, "side": "sell",
-        //                "quantity": quantity, "limit_price": limitPrice}
+        // Request body: {"order_id": orderId, "symbol": order.symbol(),
+        //                "side": order.side(), "quantity": order.quantity(),
+        //                "limit_price": order.limitPrice()}
         // Handle response: 200 OK (filled), 202 Accepted (partial), 400 Rejected
 
         throw new UnsupportedOperationException("Not implemented yet");
@@ -87,7 +66,7 @@ public class ExternalOrderPublisher {
         logger.info("Starting order generation for symbols: {}", symbols);
 
         // TODO: Implement continuous order generation loop
-        // - For each symbol, generate random buy or sell order
+        // - For each symbol, generate random ExternalOrder
         // - Random quantity between 1-20
         // - Random price near reference price (e.g., 100 +/- 5)
         // - Sleep between orders to control rate (e.g., 2 orders/second)
@@ -104,23 +83,19 @@ public class ExternalOrderPublisher {
      */
     private void generateRandomOrder(String symbol) {
         // Random buy or sell
-        boolean isBuy = random.nextBoolean();
+        Side side = random.nextBoolean() ? Side.buy : Side.sell;
 
         // Random quantity between 1 and 20
         int quantity = 1 + random.nextInt(20);
 
         // Random price around reference price (simplified: 100 +/- 5)
-        BigDecimal referencePrice = new BigDecimal("100.00");
+        double referencePrice = 100.00;
         double priceOffset = (random.nextDouble() * 10) - 5; // -5 to +5
-        BigDecimal price = referencePrice.add(BigDecimal.valueOf(priceOffset))
-                .setScale(2, BigDecimal.ROUND_HALF_UP);
+        double limitPrice = Math.round((referencePrice + priceOffset) * 100.0) / 100.0; // Round to 2 decimals
 
-        // Submit the order
-        if (isBuy) {
-            submitBuyOrder(symbol, quantity, price);
-        } else {
-            submitSellOrder(symbol, quantity, price);
-        }
+        // Create and submit the order
+        ExternalOrder order = new ExternalOrder(symbol, quantity, limitPrice, side);
+        submitOrder(order);
     }
 
     /**
