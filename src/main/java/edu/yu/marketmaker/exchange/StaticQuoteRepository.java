@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.UUID;
 
 import org.springframework.stereotype.Component;
 
@@ -38,7 +39,7 @@ public class StaticQuoteRepository implements QuoteRepository {
         for (int i = 0; i < symbols.length; i++) {
             quotes.put(symbols[i], new Quote(symbols[i],
                 random.nextInt(100), random.nextInt(100), random.nextInt(100), random.nextInt(100),
-                random.nextLong(1000), random.nextLong(1000)
+                UUID.randomUUID(), random.nextLong(1000)
             ));
         }
         return quotes;
