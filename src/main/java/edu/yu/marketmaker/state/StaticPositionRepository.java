@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.UUID;
 
 import org.springframework.stereotype.Component;
 
@@ -45,7 +46,7 @@ public class StaticPositionRepository implements PositionRepository {
                 symbols[i],
                 random.nextInt(201) - 100, // netQuantity: -100 to +100
                 0L, // initial version
-                0L  // initial lastFillId
+                new UUID(0, 0)  // initial lastFillId
             ));
         }
         return positions;
