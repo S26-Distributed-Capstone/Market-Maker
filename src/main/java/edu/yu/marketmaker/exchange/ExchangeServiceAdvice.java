@@ -6,11 +6,17 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
-public class QuoteNotFoundAdvice {
+public class ExchangeServiceAdvice {
     
     @ExceptionHandler(QuoteNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public String quoteNotFound(QuoteNotFoundException ex) {
+        return ex.getMessage();
+    }
+
+    @ExceptionHandler(OrderValidationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public String badOrder(OrderValidationException ex) {
         return ex.getMessage();
     }
 }

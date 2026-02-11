@@ -4,8 +4,12 @@ import java.util.Optional;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import edu.yu.marketmaker.model.ExternalOrder;
 import edu.yu.marketmaker.model.Quote;
 import edu.yu.marketmaker.service.ServiceHealth;
 
@@ -13,9 +17,13 @@ import edu.yu.marketmaker.service.ServiceHealth;
 public class ExchangeService {
 
     private QuoteRepository quoteRepository;
+    private OrderDispatcher orderDispatcher;
+    private OrderValidator orderValidator;
 
-    public ExchangeService(QuoteRepository quoteRepository) {
+    public ExchangeService(QuoteRepository quoteRepository, OrderDispatcher orderDispatcher, OrderValidator orderValidator) {
         this.quoteRepository = quoteRepository;
+        this.orderDispatcher = orderDispatcher;
+        this.orderValidator = orderValidator;
     }
     
     @GetMapping("/quotes/{symbol}")
@@ -27,6 +35,17 @@ public class ExchangeService {
             throw new QuoteNotFoundException(symbol);
         }
         
+    }
+
+    @PutMapping("/quotes/{symbol}")
+    void putQuote(@PathVariable String symbol, @RequestBody Quote quote) {
+        quoteRepository.putQuote(quote);
+    }
+
+    @PostMapping("/orders")
+    void submitOrder(@RequestBody ExternalOrder order) {
+        orderValidator.validateOrder(quoteRepository, order);
+        orderDispatcher.dispatchOrder(order);
     }
 
     @GetMapping("/health")
