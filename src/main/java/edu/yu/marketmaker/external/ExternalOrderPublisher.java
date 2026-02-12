@@ -4,9 +4,12 @@ import edu.yu.marketmaker.model.ExternalOrder;
 import edu.yu.marketmaker.model.Side;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
+import java.io.IOException;
+import java.net.URI;
 import java.util.Random;
-import java.util.UUID;
 import java.util.List;
 import java.util.Arrays;
 
@@ -29,11 +32,14 @@ public class ExternalOrderPublisher {
     private final String exchangeBaseUrl;
     private final List<String> symbols;
     private final Random random;
+    private PersistentHttpConnection httpConnection;
+    private boolean isShutdown;
 
-    public ExternalOrderPublisher(String exchangeBaseUrl) {
+    public ExternalOrderPublisher(String exchangeBaseUrl) throws IOException {
         this.exchangeBaseUrl = exchangeBaseUrl;
         this.symbols = Arrays.asList("AAPL", "MSFT", "GOOG", "TSLA");
         this.random = new Random();
+        this.isShutdown = false;
     }
 
     /**
@@ -41,29 +47,36 @@ public class ExternalOrderPublisher {
      * Calls POST /orders on Exchange API.
      *
      * @param order The ExternalOrder to submit
-     * @return orderId if accepted, null if rejected
      */
-    public String submitOrder(ExternalOrder order) {
-        String orderId = UUID.randomUUID().toString();
+    public void submitOrder(ExternalOrder order) {
+        if (this.httpConnection == null) {
+            throw new IllegalStateException("HTTP connection not initialized");
+        }
 
         logger.info("Submitting {} order: {} x {} @ {}",
                 order.side(), order.symbol(), order.quantity(), order.limitPrice());
 
-        // TODO: Implement HTTP POST to {exchangeBaseUrl}/orders
-        // Request body: {"order_id": orderId, "symbol": order.symbol(),
-        //                "side": order.side(), "quantity": order.quantity(),
-        //                "limit_price": order.limitPrice()}
-        // Handle response: 200 OK (filled), 202 Accepted (partial), 400 Rejected
+        ObjectMapper mapper = JsonMapper
+                .builder()
+                .findAndAddModules()
+                .build();
+        String serializedOrder = mapper.writeValueAsString(order);
 
-        throw new UnsupportedOperationException("Not implemented yet");
+        try {
+            this.httpConnection.sendData(serializedOrder);
+        } catch (IOException e) {
+            logger.error("Failed to submit order: {}", e.getMessage());
+        }
     }
 
     /**
      * Generate and submit random orders continuously.
-     * Creates concurrent load by submitting orders for multiple symbols simultaneously.
+     * Creates a concurrent load by submitting orders for multiple symbols simultaneously.
      */
-    public void startGeneratingOrders() {
+    public void startGeneratingOrders() throws IOException {
         logger.info("Starting order generation for symbols: {}", symbols);
+
+        this.httpConnection = new PersistentHttpConnection(URI.create(this.exchangeBaseUrl));
 
         // TODO: Implement continuous order generation loop
         // - For each symbol, generate random ExternalOrder
@@ -72,7 +85,19 @@ public class ExternalOrderPublisher {
         // - Sleep between orders to control rate (e.g., 2 orders/second)
         // - Use multiple threads for concurrency across symbols
 
-        throw new UnsupportedOperationException("Not implemented yet");
+        while (!this.isShutdown) {
+            for (int i=0; i < this.random.nextInt(20); i++) { // Generate 10 orders per batch
+                for (String symbol : symbols) {
+                    generateRandomOrder(symbol);
+                }
+            }
+            try {
+                Thread.sleep(500); // Sleep for 0.5 seconds between batches
+            } catch (InterruptedException e) {
+                logger.warn("Order generation interrupted: {}", e.getMessage());
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 
     /**
@@ -101,13 +126,14 @@ public class ExternalOrderPublisher {
     /**
      * Stop generating orders.
      */
-    public void stop() {
+    public void stop() throws IOException {
         logger.info("Stopping order generation");
 
         // TODO: Implement graceful shutdown
         // - Stop all order generation threads
         // - Wait for in-flight requests to complete
 
-        throw new UnsupportedOperationException("Not implemented yet");
+        this.isShutdown = true;
+        this.httpConnection.close();
     }
 }
