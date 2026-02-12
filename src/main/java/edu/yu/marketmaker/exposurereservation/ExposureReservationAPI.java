@@ -1,6 +1,8 @@
 package edu.yu.marketmaker.exposurereservation;
 
 import edu.yu.marketmaker.model.*;
+
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,6 +13,7 @@ import java.util.UUID;
  * Provides endpoints to reserve exposure capacity, managing fills, and releasing reservations.
  */
 @RestController
+@Profile("exposure-reservation")
 public class ExposureReservationAPI {
 
     private final ExposureReservationService service;

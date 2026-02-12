@@ -6,11 +6,13 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import edu.yu.marketmaker.model.Quote;
 
 @Component
+@Profile("testing")
 public class StaticQuoteRepository implements QuoteRepository {
 
     private final Map<String, Quote> map;

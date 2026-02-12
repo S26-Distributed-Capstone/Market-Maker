@@ -2,6 +2,7 @@ package edu.yu.marketmaker.exchange;
 
 import java.util.Optional;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,6 +15,7 @@ import edu.yu.marketmaker.model.Quote;
 import edu.yu.marketmaker.service.ServiceHealth;
 
 @RestController
+@Profile("exchange")
 public class ExchangeService {
 
     private QuoteRepository quoteRepository;
