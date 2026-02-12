@@ -13,8 +13,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ExposureReservationService {
     private final ReservationRepository repo;
     // Simple global capacity per symbol mock
-    private final Map<String, Long> capacityConfig = new ConcurrentHashMap<>();
-    private static final long DEFAULT_CAPACITY = 10000;
+    private final Map<String, Integer> capacityConfig = new ConcurrentHashMap<>();
+    private static final int DEFAULT_CAPACITY = 10000;
 
     public ExposureReservationService(ReservationRepository repo) {
         this.repo = repo;
@@ -28,14 +28,14 @@ public class ExposureReservationService {
      * @return The response containing the reservation ID and the actual granted quantity.
      */
     public synchronized ReservationResponse createReservation(Quote quote) {
-        long limit = capacityConfig.getOrDefault(quote.symbol(), DEFAULT_CAPACITY);
-        long currentUsage = repo.findAll().stream()
+        int limit = capacityConfig.getOrDefault(quote.symbol(), DEFAULT_CAPACITY);
+        int currentUsage = repo.findAll().stream()
                 .filter(r -> r.symbol().equals(quote.symbol()))
-                .mapToLong(Reservation::granted)
+                .mapToInt(Reservation::granted)
                 .sum();
 
-        long available = Math.max(0, limit - currentUsage);
-        long granted = Math.min(quote.askQuantity(), available);
+        int available = Math.max(0, limit - currentUsage);
+        int granted = Math.min(quote.askQuantity(), available);
 
         ReservationStatus status;
         if (granted == 0 && quote.askQuantity() > 0) status = ReservationStatus.DENIED;
@@ -58,7 +58,7 @@ public class ExposureReservationService {
      * @return The amount of capacity freed by this operation.
      * @throws RuntimeException if the reservation is not found.
      */
-    public synchronized long applyFill(UUID id, long filledQty) {
+    public synchronized int applyFill(UUID id, int filledQty) {
         Reservation r = repo.findById(id).orElseThrow(() -> new RuntimeException("Reservation not found"));
         return reduceGrantOnFill(r, filledQty);
     }
@@ -71,7 +71,7 @@ public class ExposureReservationService {
      * @return The total capacity freed.
      * @throws RuntimeException if the reservation is not found.
      */
-    public synchronized long release(UUID id) {
+    public synchronized int release(UUID id) {
         Reservation r = repo.findById(id).orElseThrow(() -> new RuntimeException("Reservation not found"));
         return releaseRemaining(r);
     }
@@ -84,9 +84,9 @@ public class ExposureReservationService {
      * @param fillQty The quantity filled.
      * @return The amount of capacity to free (min of current granted and fill quantity).
      */
-    private long reduceGrantOnFill(Reservation r, long fillQty) {
-        long toFree = Math.min(r.granted(), fillQty);
-        long newGranted = r.granted() - toFree;
+    private int reduceGrantOnFill(Reservation r, int fillQty) {
+        int toFree = Math.min(r.granted(), fillQty);
+        int newGranted = r.granted() - toFree;
 
         // Update record
         Reservation updated = new Reservation(r.id(), r.symbol(), r.requested(), newGranted, r.status());
@@ -101,8 +101,8 @@ public class ExposureReservationService {
      * @param r The reservation to release.
      * @return The amount of capacity that was freed.
      */
-    private long releaseRemaining(Reservation r) {
-        long toFree = r.granted();
+    private int releaseRemaining(Reservation r) {
+        int toFree = r.granted();
 
         // Update record
         Reservation updated = new Reservation(r.id(), r.symbol(), r.requested(), 0, r.status());
@@ -117,7 +117,7 @@ public class ExposureReservationService {
      * @return Snapshot of usage, capacity, and active count.
      */
     public ExposureState getExposureState() {
-        long totalUsage = repo.findAll().stream().mapToLong(Reservation::granted).sum();
+        int totalUsage = repo.findAll().stream().mapToInt(Reservation::granted).sum();
         int activeCount = (int) repo.findAll().stream().filter(r -> r.granted() > 0).count();
         // Summing default capacity for illustration, essentially assuming 1 symbol or simplified view
         return new ExposureState(totalUsage, DEFAULT_CAPACITY, activeCount);
