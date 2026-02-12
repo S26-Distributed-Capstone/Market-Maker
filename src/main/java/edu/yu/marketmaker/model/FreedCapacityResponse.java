@@ -1,5 +1,5 @@
 package edu.yu.marketmaker.model;
 
-public record FreedCapacityResponse(long freedCapacity) {
+public record FreedCapacityResponse(int freedCapacity) {
 
 }
