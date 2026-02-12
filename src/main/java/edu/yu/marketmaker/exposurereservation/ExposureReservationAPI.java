@@ -42,8 +42,8 @@ public class ExposureReservationAPI {
      * @return A response indicating the capacity that was freed up by this fill.
      */
     @PostMapping("/reservations/{id}/apply-fill")
-    public ResponseEntity<FreedCapacityResponse> applyFill(@PathVariable UUID id, @RequestBody long requestedQuantity) {
-        long freed = service.applyFill(id, requestedQuantity);
+    public ResponseEntity<FreedCapacityResponse> applyFill(@PathVariable UUID id, @RequestBody int requestedQuantity) {
+        int freed = service.applyFill(id, requestedQuantity);
         return ResponseEntity.ok(new FreedCapacityResponse(freed));
     }
 
@@ -57,7 +57,7 @@ public class ExposureReservationAPI {
      */
     @PostMapping("/reservations/{id}/release")
     public ResponseEntity<FreedCapacityResponse> release(@PathVariable UUID id) {
-        long freed = service.release(id);
+        int freed = service.release(id);
         return ResponseEntity.ok(new FreedCapacityResponse(freed));
     }
 
