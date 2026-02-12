@@ -2,6 +2,8 @@ package edu.yu.marketmaker.state;
 
 import edu.yu.marketmaker.model.Fill;
 import edu.yu.marketmaker.model.Position;
+
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,6 +15,7 @@ import java.util.Optional;
 
 
 @RestController
+@Profile("trading-state")
 public class TradingStateService {
 
     private final PositionRepository positionRepository;

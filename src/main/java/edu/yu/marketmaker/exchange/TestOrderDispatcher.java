@@ -2,11 +2,13 @@ package edu.yu.marketmaker.exchange;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import edu.yu.marketmaker.model.ExternalOrder;
 
 @Component
+@Profile("testing")
 public class TestOrderDispatcher implements OrderDispatcher {
 
     private static final Logger logger = LoggerFactory.getLogger(TestOrderDispatcher.class);

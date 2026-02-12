@@ -4,6 +4,9 @@ import edu.yu.marketmaker.model.Reservation;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.context.annotation.Profile;
+
+@Profile("testing")
 public class InMemoryReservationRepository implements ReservationRepository {
     private final Map<UUID, Reservation> store = new ConcurrentHashMap<>();
 
