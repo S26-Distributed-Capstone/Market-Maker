@@ -1,56 +1,47 @@
 package edu.yu.marketmaker.external;
 
 import java.io.IOException;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.util.concurrent.CompletableFuture;
+import java.time.Duration;
 
 public class PersistentHttpConnection {
 
     private final HttpClient client;
-    private final PipedOutputStream outputStream;
-    private final PipedInputStream inputStream;
-    private CompletableFuture<HttpResponse<String>> responseFuture;
+    private final URI targetUri;
 
-    public PersistentHttpConnection(URI targetUri) throws IOException {
-        this.client = HttpClient.newBuilder().build();
+    public PersistentHttpConnection(URI targetUri) {
+        // HttpClient manages the persistent TCP connection pool automatically
+        this.client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_2)
+                .connectTimeout(Duration.ofSeconds(5))
+                .build();
+        this.targetUri = targetUri;
+    }
 
-        // Connect the pipe: what we write to 'outputStream' appears in 'inputStream'
-        this.outputStream = new PipedOutputStream();
-        this.inputStream = new PipedInputStream(outputStream);
-
-        // Prepare the request with a streaming body
+    /**
+     * Sends a separate POST request for each order.
+     * The HttpClient reuses the underlying TCP connection (Keep-Alive).
+     */
+    public void sendData(String jsonBody) {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(targetUri)
-                .POST(HttpRequest.BodyPublishers.ofInputStream(() -> inputStream))
-                .header("Content-Type", "application/octet-stream")
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
                 .build();
 
-        // Start the request asynchronously
-        this.responseFuture = client.sendAsync(request, HttpResponse.BodyHandlers.ofString());
-    }
-
-    /**
-     * Call this method whenever you have new data to send.
-     */
-    public synchronized void sendData(String data) throws IOException {
-        outputStream.write(data.getBytes(StandardCharsets.UTF_8));
-        outputStream.flush(); // Forces the data into the network buffer
-    }
-
-    /**
-     * Call this when you are finished to close the connection properly.
-     */
-    public void close() throws IOException {
-        outputStream.close();
-    }
-
-    public CompletableFuture<HttpResponse<String>> getResponse() {
-        return responseFuture;
+        // Send asynchronously to avoid blocking the generator loop
+        client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenAccept(response -> {
+                    if (response.statusCode() >= 400) {
+                        System.err.println("Order rejected: " + response.statusCode() + " " + response.body());
+                    }
+                })
+                .exceptionally(ex -> {
+                    System.err.println("Network error: " + ex.getMessage());
+                    return null;
+                });
     }
 }

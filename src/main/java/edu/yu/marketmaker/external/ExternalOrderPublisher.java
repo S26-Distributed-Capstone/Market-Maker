@@ -62,11 +62,7 @@ public class ExternalOrderPublisher {
                 .build();
         String serializedOrder = mapper.writeValueAsString(order);
 
-        try {
-            this.httpConnection.sendData(serializedOrder);
-        } catch (IOException e) {
-            logger.error("Failed to submit order: {}", e.getMessage());
-        }
+        this.httpConnection.sendData(serializedOrder);
     }
 
     /**
@@ -134,6 +130,5 @@ public class ExternalOrderPublisher {
         // - Wait for in-flight requests to complete
 
         this.isShutdown = true;
-        this.httpConnection.close();
     }
 }
