@@ -6,6 +6,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.util.UUID;
 
+/**
+ * Entity used by hazelcast
+ */
 @Entity
 @Table(name = "positions")
 public class PositionEntity {
