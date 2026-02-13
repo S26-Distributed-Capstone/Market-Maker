@@ -4,8 +4,8 @@ import com.hazelcast.config.*;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import edu.yu.marketmaker.model.Position;
-import edu.yu.marketmaker.state.persistence.JpaPositionRepository;
-import edu.yu.marketmaker.state.persistence.PositionMapStore;
+import edu.yu.marketmaker.persistence.JpaPositionRepository;
+import edu.yu.marketmaker.persistence.PositionMapStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 

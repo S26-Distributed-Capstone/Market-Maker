@@ -1,4 +1,4 @@
-package edu.yu.marketmaker.state.persistence;
+package edu.yu.marketmaker.persistence;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

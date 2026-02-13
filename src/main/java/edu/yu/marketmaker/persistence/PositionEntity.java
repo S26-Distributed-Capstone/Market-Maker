@@ -1,4 +1,4 @@
-package edu.yu.marketmaker.state.persistence;
+package edu.yu.marketmaker.persistence;
 
 import edu.yu.marketmaker.model.Position;
 import jakarta.persistence.Entity;

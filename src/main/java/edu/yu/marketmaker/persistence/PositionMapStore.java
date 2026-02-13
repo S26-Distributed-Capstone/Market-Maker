@@ -1,4 +1,4 @@
-package edu.yu.marketmaker.state.persistence;
+package edu.yu.marketmaker.persistence;
 
 import com.hazelcast.map.MapStore;
 import edu.yu.marketmaker.model.Position;
