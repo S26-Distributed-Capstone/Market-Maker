@@ -1,5 +1,6 @@
 package edu.yu.marketmaker.state;
 
+import edu.yu.marketmaker.memory.interfaces.PositionRepository;
 import edu.yu.marketmaker.model.Fill;
 import edu.yu.marketmaker.model.Position;
 

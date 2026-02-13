@@ -1,4 +1,4 @@
-package edu.yu.marketmaker.state;
+package edu.yu.marketmaker.memory.interfaces;
 
 import edu.yu.marketmaker.model.Position;
 

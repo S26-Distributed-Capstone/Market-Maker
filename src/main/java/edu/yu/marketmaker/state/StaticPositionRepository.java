@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
 
+import edu.yu.marketmaker.memory.interfaces.PositionRepository;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 

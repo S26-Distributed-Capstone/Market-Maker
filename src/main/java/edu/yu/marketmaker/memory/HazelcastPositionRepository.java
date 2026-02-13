@@ -1,6 +1,7 @@
-package edu.yu.marketmaker.state;
+package edu.yu.marketmaker.memory;
 
 import com.hazelcast.map.IMap;
+import edu.yu.marketmaker.memory.interfaces.PositionRepository;
 import edu.yu.marketmaker.model.Position;
 import org.springframework.stereotype.Repository;
 

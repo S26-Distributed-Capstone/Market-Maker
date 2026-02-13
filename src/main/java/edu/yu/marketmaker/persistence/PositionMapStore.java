@@ -2,6 +2,7 @@ package edu.yu.marketmaker.persistence;
 
 import com.hazelcast.map.MapStore;
 import edu.yu.marketmaker.model.Position;
+import edu.yu.marketmaker.persistence.interfaces.JpaPositionRepository;
 
 import java.util.Collection;
 import java.util.Map;
