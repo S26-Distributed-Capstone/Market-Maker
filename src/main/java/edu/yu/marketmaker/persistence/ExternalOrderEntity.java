@@ -8,11 +8,10 @@ import java.util.UUID;
 
 /**
  * JPA Entity for ExternalOrder records used by Hazelcast MapStore.
- * Note: ExternalOrder doesn't have a natural ID, so we generate one.
  */
 @Entity
 @Table(name = "external_orders")
-public class ExternalOrderEntity {
+public class ExternalOrderEntity implements IdentifiableEntity<UUID> {
 
     @Id
     private UUID id;
@@ -41,6 +40,13 @@ public class ExternalOrderEntity {
         this.side = side;
     }
 
+    // --- IdentifiableEntity Implementation ---
+
+    @Override
+    public UUID getId() {
+        return id;
+    }
+
     // --- Conversion Methods ---
 
     /**
@@ -67,10 +73,6 @@ public class ExternalOrderEntity {
     }
 
     // --- Getters and Setters ---
-
-    public UUID getId() {
-        return id;
-    }
 
     public void setId(UUID id) {
         this.id = id;

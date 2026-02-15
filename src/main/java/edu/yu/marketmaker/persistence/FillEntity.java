@@ -11,7 +11,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "fills")
-public class FillEntity {
+public class FillEntity implements IdentifiableEntity<UUID> {
 
     @Id
     private UUID orderId;
@@ -42,6 +42,13 @@ public class FillEntity {
         this.price = price;
         this.quoteId = quoteId;
         this.createdAt = createdAt;
+    }
+
+    // --- IdentifiableEntity Implementation ---
+
+    @Override
+    public UUID getId() {
+        return orderId;
     }
 
     // --- Conversion Methods ---

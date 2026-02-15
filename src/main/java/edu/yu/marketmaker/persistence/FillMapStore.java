@@ -2,7 +2,6 @@ package edu.yu.marketmaker.persistence;
 
 import com.hazelcast.map.MapStore;
 import edu.yu.marketmaker.model.Fill;
-import edu.yu.marketmaker.persistence.interfaces.JpaFillRepository;
 
 import java.util.Collection;
 import java.util.Map;
@@ -16,9 +15,9 @@ import java.util.stream.Collectors;
  */
 public class FillMapStore implements MapStore<UUID, Fill> {
 
-    private final JpaFillRepository repository;
+    private final BaseJpaRepository<FillEntity, UUID> repository;
 
-    public FillMapStore(JpaFillRepository repository) {
+    public FillMapStore(BaseJpaRepository<FillEntity, UUID> repository) {
         this.repository = repository;
     }
 

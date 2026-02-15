@@ -12,7 +12,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "quotes")
-public class QuoteEntity {
+public class QuoteEntity implements IdentifiableEntity<UUID> {
 
     @Id
     private UUID quoteId;
@@ -42,6 +42,13 @@ public class QuoteEntity {
         this.askPrice = askPrice;
         this.askQuantity = askQuantity;
         this.expiresAt = expiresAt;
+    }
+
+    // --- IdentifiableEntity Implementation ---
+
+    @Override
+    public UUID getId() {
+        return quoteId;
     }
 
     // --- Conversion Methods ---

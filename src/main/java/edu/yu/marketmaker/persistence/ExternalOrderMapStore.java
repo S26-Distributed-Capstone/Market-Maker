@@ -2,7 +2,6 @@ package edu.yu.marketmaker.persistence;
 
 import com.hazelcast.map.MapStore;
 import edu.yu.marketmaker.model.ExternalOrder;
-import edu.yu.marketmaker.persistence.interfaces.JpaExternalOrderRepository;
 
 import java.util.Collection;
 import java.util.Map;
@@ -13,14 +12,12 @@ import java.util.stream.Collectors;
  * Hazelcast MapStore implementation for ExternalOrder records.
  * This class bridges the Hazelcast IMap with PostgreSQL persistence
  * by converting between ExternalOrder records and ExternalOrderEntity objects.
- *
- * Note: ExternalOrder doesn't have a natural ID, so the map key (UUID) is used as the entity ID.
  */
 public class ExternalOrderMapStore implements MapStore<UUID, ExternalOrder> {
 
-    private final JpaExternalOrderRepository repository;
+    private final BaseJpaRepository<ExternalOrderEntity, UUID> repository;
 
-    public ExternalOrderMapStore(JpaExternalOrderRepository repository) {
+    public ExternalOrderMapStore(BaseJpaRepository<ExternalOrderEntity, UUID> repository) {
         this.repository = repository;
     }
 

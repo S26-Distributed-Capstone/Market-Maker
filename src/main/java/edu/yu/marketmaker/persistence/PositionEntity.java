@@ -11,7 +11,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "positions")
-public class PositionEntity {
+public class PositionEntity implements IdentifiableEntity<String> {
 
     @Id
     private String symbol;
@@ -35,6 +35,13 @@ public class PositionEntity {
         this.netQuantity = netQuantity;
         this.version = version;
         this.lastFillId = lastFillId;
+    }
+
+    // --- IdentifiableEntity Implementation ---
+
+    @Override
+    public String getId() {
+        return symbol;
     }
 
     // --- Conversion Methods ---

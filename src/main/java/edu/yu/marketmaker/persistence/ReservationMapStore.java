@@ -2,7 +2,6 @@ package edu.yu.marketmaker.persistence;
 
 import com.hazelcast.map.MapStore;
 import edu.yu.marketmaker.model.Reservation;
-import edu.yu.marketmaker.persistence.interfaces.JpaReservationRepository;
 
 import java.util.Collection;
 import java.util.Map;
@@ -16,9 +15,9 @@ import java.util.stream.Collectors;
  */
 public class ReservationMapStore implements MapStore<UUID, Reservation> {
 
-    private final JpaReservationRepository repository;
+    private final BaseJpaRepository<ReservationEntity, UUID> repository;
 
-    public ReservationMapStore(JpaReservationRepository repository) {
+    public ReservationMapStore(BaseJpaRepository<ReservationEntity, UUID> repository) {
         this.repository = repository;
     }
 

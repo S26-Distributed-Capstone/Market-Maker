@@ -11,7 +11,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "reservations")
-public class ReservationEntity {
+public class ReservationEntity implements IdentifiableEntity<UUID> {
 
     @Id
     private UUID id;
@@ -40,6 +40,13 @@ public class ReservationEntity {
         this.status = status;
     }
 
+    // --- IdentifiableEntity Implementation ---
+
+    @Override
+    public UUID getId() {
+        return id;
+    }
+
     // --- Conversion Methods ---
 
     /**
@@ -66,10 +73,6 @@ public class ReservationEntity {
     }
 
     // --- Getters and Setters ---
-
-    public UUID getId() {
-        return id;
-    }
 
     public void setId(UUID id) {
         this.id = id;

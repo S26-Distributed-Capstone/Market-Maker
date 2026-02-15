@@ -2,7 +2,6 @@ package edu.yu.marketmaker.persistence;
 
 import com.hazelcast.map.MapStore;
 import edu.yu.marketmaker.model.Quote;
-import edu.yu.marketmaker.persistence.interfaces.JpaQuoteRepository;
 
 import java.util.Collection;
 import java.util.Map;
@@ -16,9 +15,9 @@ import java.util.stream.Collectors;
  */
 public class QuoteMapStore implements MapStore<UUID, Quote> {
 
-    private final JpaQuoteRepository repository;
+    private final BaseJpaRepository<QuoteEntity, UUID> repository;
 
-    public QuoteMapStore(JpaQuoteRepository repository) {
+    public QuoteMapStore(BaseJpaRepository<QuoteEntity, UUID> repository) {
         this.repository = repository;
     }
 

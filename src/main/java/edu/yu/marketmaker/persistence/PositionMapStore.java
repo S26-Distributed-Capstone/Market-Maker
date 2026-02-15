@@ -2,7 +2,6 @@ package edu.yu.marketmaker.persistence;
 
 import com.hazelcast.map.MapStore;
 import edu.yu.marketmaker.model.Position;
-import edu.yu.marketmaker.persistence.interfaces.JpaPositionRepository;
 
 import java.util.Collection;
 import java.util.Map;
@@ -15,9 +14,9 @@ import java.util.stream.Collectors;
  */
 public class PositionMapStore implements MapStore<String, Position> {
 
-    private final JpaPositionRepository repository;
+    private final BaseJpaRepository<PositionEntity, String> repository;
 
-    public PositionMapStore(JpaPositionRepository repository) {
+    public PositionMapStore(BaseJpaRepository<PositionEntity, String> repository) {
         this.repository = repository;
     }
 
