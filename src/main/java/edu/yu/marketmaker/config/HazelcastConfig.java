@@ -3,6 +3,9 @@ package edu.yu.marketmaker.config;
 import com.hazelcast.config.*;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.map.IMap;
+import edu.yu.marketmaker.memory.HazelcastRepository;
+import edu.yu.marketmaker.memory.Repository;
 import edu.yu.marketmaker.model.*;
 import edu.yu.marketmaker.persistence.*;
 import edu.yu.marketmaker.persistence.interfaces.*;
@@ -155,5 +158,47 @@ public class HazelcastConfig {
     @Bean
     public com.hazelcast.map.IMap<UUID, Reservation> reservationsMap(HazelcastInstance hazelcastInstance) {
         return hazelcastInstance.getMap(RESERVATIONS_MAP_NAME);
+    }
+
+    // --- Repository Beans using Generic HazelcastRepository ---
+
+    /**
+     * Provides the Position repository for dependency injection.
+     */
+    @Bean
+    public Repository<String, Position> positionRepository(IMap<String, Position> positionsMap) {
+        return new HazelcastRepository<>(positionsMap);
+    }
+
+    /**
+     * Provides the Fill repository for dependency injection.
+     */
+    @Bean
+    public Repository<UUID, Fill> fillRepository(IMap<UUID, Fill> fillsMap) {
+        return new HazelcastRepository<>(fillsMap);
+    }
+
+    /**
+     * Provides the Quote repository for dependency injection.
+     */
+    @Bean
+    public Repository<UUID, Quote> quoteRepository(IMap<UUID, Quote> quotesMap) {
+        return new HazelcastRepository<>(quotesMap);
+    }
+
+    /**
+     * Provides the ExternalOrder repository for dependency injection.
+     */
+    @Bean
+    public Repository<UUID, ExternalOrder> externalOrderRepository(IMap<UUID, ExternalOrder> externalOrdersMap) {
+        return new HazelcastRepository<>(externalOrdersMap);
+    }
+
+    /**
+     * Provides the Reservation repository for dependency injection.
+     */
+    @Bean
+    public Repository<UUID, Reservation> reservationRepository(IMap<UUID, Reservation> reservationsMap) {
+        return new HazelcastRepository<>(reservationsMap);
     }
 }

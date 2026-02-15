@@ -11,5 +11,10 @@ import java.util.UUID;
  * @param version monotonic per symbol
  * @param lastFillId
  */
-public record Position(String symbol, int netQuantity, long version, UUID lastFillId) {
+public record Position(String symbol, int netQuantity, long version, UUID lastFillId) implements Identifiable<String> {
+
+    @Override
+    public String getId() {
+        return symbol;
+    }
 }

@@ -115,7 +115,7 @@ public class ExternalOrderPublisher {
         double limitPrice = Math.round((referencePrice + priceOffset) * 100.0) / 100.0; // Round to 2 decimals
 
         // Create and submit the order
-        ExternalOrder order = new ExternalOrder(symbol, quantity, limitPrice, side);
+        ExternalOrder order = new ExternalOrder(java.util.UUID.randomUUID(), symbol, quantity, limitPrice, side);
         submitOrder(order);
     }
 

@@ -28,14 +28,14 @@ public class ExternalOrderMapStore implements MapStore<UUID, ExternalOrder> {
 
     @Override
     public void store(UUID key, ExternalOrder order) {
-        ExternalOrderEntity entity = ExternalOrderEntity.fromRecord(key, order);
+        ExternalOrderEntity entity = ExternalOrderEntity.fromRecord(order);
         repository.save(entity);
     }
 
     @Override
     public void storeAll(Map<UUID, ExternalOrder> map) {
-        var entities = map.entrySet().stream()
-                .map(entry -> ExternalOrderEntity.fromRecord(entry.getKey(), entry.getValue()))
+        var entities = map.values().stream()
+                .map(ExternalOrderEntity::fromRecord)
                 .collect(Collectors.toList());
         repository.saveAll(entities);
     }

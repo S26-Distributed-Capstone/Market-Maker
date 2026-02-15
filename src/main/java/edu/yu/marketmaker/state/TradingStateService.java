@@ -1,6 +1,6 @@
 package edu.yu.marketmaker.state;
 
-import edu.yu.marketmaker.memory.interfaces.PositionRepository;
+import edu.yu.marketmaker.memory.Repository;
 import edu.yu.marketmaker.model.Fill;
 import edu.yu.marketmaker.model.Position;
 
@@ -19,9 +19,9 @@ import java.util.Optional;
 @Profile("trading-state")
 public class TradingStateService {
 
-    private final PositionRepository positionRepository;
+    private final Repository<String, Position> positionRepository;
 
-    public TradingStateService(PositionRepository positionRepository) {
+    public TradingStateService(Repository<String, Position> positionRepository) {
         this.positionRepository = positionRepository;
     }
 
@@ -40,7 +40,7 @@ public class TradingStateService {
      */
     @GetMapping("/positions")
     Collection<Position> getAllPositions() {
-        return positionRepository.getAllPositions();
+        return positionRepository.getAll();
     }
 
     /**
@@ -50,7 +50,7 @@ public class TradingStateService {
      */
     @GetMapping("/positions/{symbol}")
     Optional<Position> getPosition(@PathVariable String symbol) {
-        return positionRepository.getPosition(symbol);
+        return positionRepository.get(symbol);
     }
 
 }

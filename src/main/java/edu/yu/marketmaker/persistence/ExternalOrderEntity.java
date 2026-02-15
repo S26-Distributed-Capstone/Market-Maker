@@ -48,18 +48,17 @@ public class ExternalOrderEntity {
      * @return An ExternalOrder record.
      */
     public ExternalOrder toRecord() {
-        return new ExternalOrder(this.symbol, this.quantity, this.limitPrice, this.side);
+        return new ExternalOrder(this.id, this.symbol, this.quantity, this.limitPrice, this.side);
     }
 
     /**
-     * Static helper to create an Entity from a Record with a given ID.
-     * @param id The unique identifier for the order.
+     * Static helper to create an Entity from a Record.
      * @param order The external order record.
      * @return A new ExternalOrderEntity.
      */
-    public static ExternalOrderEntity fromRecord(UUID id, ExternalOrder order) {
+    public static ExternalOrderEntity fromRecord(ExternalOrder order) {
         return new ExternalOrderEntity(
-                id,
+                order.id(),
                 order.symbol(),
                 order.quantity(),
                 order.limitPrice(),
