@@ -98,9 +98,10 @@ public class HazelcastConfig {
 
         mapConfig.setMapStoreConfig(mapStoreConfig);
 
-        // Eviction policy - keep data in memory
+        // Eviction policy - keep all data in memory (no eviction)
         EvictionConfig evictionConfig = new EvictionConfig();
         evictionConfig.setEvictionPolicy(EvictionPolicy.NONE);
+        evictionConfig.setMaxSizePolicy(MaxSizePolicy.PER_NODE);
         mapConfig.setEvictionConfig(evictionConfig);
 
         // Backup configuration
