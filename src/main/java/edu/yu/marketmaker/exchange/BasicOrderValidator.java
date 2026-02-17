@@ -8,10 +8,7 @@ import edu.yu.marketmaker.model.ExternalOrder;
 public class BasicOrderValidator implements OrderValidator {
 
     @Override
-    public void validateOrder(QuoteRepository repository, ExternalOrder order) throws OrderValidationException {
-        if (order.symbol() == null || !repository.getQuote(order.symbol()).isPresent()) {
-            throw new OrderValidationException("Invalid ticker");
-        }
+    public void validateOrder(ExternalOrder order) throws OrderValidationException {
         if (order.quantity() <= 0 || order.limitPrice() <= 0) {
             throw new OrderValidationException("Invalid quantity or price");
         }

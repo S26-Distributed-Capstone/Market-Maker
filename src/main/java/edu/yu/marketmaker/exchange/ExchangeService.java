@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import edu.yu.marketmaker.memory.Repository;
 import edu.yu.marketmaker.model.ExternalOrder;
 import edu.yu.marketmaker.model.Quote;
 import edu.yu.marketmaker.service.ServiceHealth;
@@ -18,11 +19,11 @@ import edu.yu.marketmaker.service.ServiceHealth;
 @Profile("exchange")
 public class ExchangeService {
 
-    private QuoteRepository quoteRepository;
+    private Repository<String, Quote> quoteRepository;
     private OrderDispatcher orderDispatcher;
     private OrderValidator orderValidator;
 
-    public ExchangeService(QuoteRepository quoteRepository, OrderDispatcher orderDispatcher, OrderValidator orderValidator) {
+    public ExchangeService(Repository<String, Quote> quoteRepository, OrderDispatcher orderDispatcher, OrderValidator orderValidator) {
         this.quoteRepository = quoteRepository;
         this.orderDispatcher = orderDispatcher;
         this.orderValidator = orderValidator;
@@ -30,7 +31,7 @@ public class ExchangeService {
     
     @GetMapping("/quotes/{symbol}")
     Quote getQuote(@PathVariable String symbol) {
-        Optional<Quote> quote = quoteRepository.getQuote(symbol);
+        Optional<Quote> quote = quoteRepository.get(symbol);
         if (quote.isPresent()) {
             return quote.get();
         } else {
@@ -41,12 +42,12 @@ public class ExchangeService {
 
     @PutMapping("/quotes/{symbol}")
     void putQuote(@PathVariable String symbol, @RequestBody Quote quote) {
-        quoteRepository.putQuote(quote);
+        quoteRepository.put(quote);
     }
 
     @PostMapping("/orders")
     void submitOrder(@RequestBody ExternalOrder order) {
-        orderValidator.validateOrder(quoteRepository, order);
+        orderValidator.validateOrder(order);
         orderDispatcher.dispatchOrder(order);
     }
 

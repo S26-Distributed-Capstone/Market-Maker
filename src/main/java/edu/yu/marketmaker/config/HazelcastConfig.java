@@ -183,7 +183,7 @@ public class HazelcastConfig {
      * Provides the Quote repository for dependency injection.
      */
     @Bean
-    public Repository<UUID, Quote> quoteRepository(IMap<UUID, Quote> quotesMap) {
+    public Repository<String, Quote> quoteRepository(IMap<String, Quote> quotesMap) {
         return new HazelcastRepository<>(quotesMap);
     }
 
