@@ -1,0 +1,12 @@
+services:
+  app:
+    image: market-maker
+    depends_on:
+      - postgres
+  postgres:  # <--- THIS IS THE SERVICE NAME
+    image: postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5432:5432"
