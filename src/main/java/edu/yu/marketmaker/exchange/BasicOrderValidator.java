@@ -1,10 +1,12 @@
 package edu.yu.marketmaker.exchange;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import edu.yu.marketmaker.model.ExternalOrder;
 
 @Component
+@Profile("exchange")
 public class BasicOrderValidator implements OrderValidator {
 
     @Override
