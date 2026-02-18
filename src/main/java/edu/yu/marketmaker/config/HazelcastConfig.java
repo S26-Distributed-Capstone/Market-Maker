@@ -141,7 +141,7 @@ public class HazelcastConfig {
      * Provides the quotes IMap for dependency injection.
      */
     @Bean
-    public com.hazelcast.map.IMap<UUID, Quote> quotesMap(HazelcastInstance hazelcastInstance) {
+    public com.hazelcast.map.IMap<String, Quote> quotesMap(HazelcastInstance hazelcastInstance) {
         return hazelcastInstance.getMap(QUOTES_MAP_NAME);
     }
 

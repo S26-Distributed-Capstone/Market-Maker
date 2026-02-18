@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import edu.yu.marketmaker.model.ExternalOrder;
 
 @Component
-@Profile("testing")
+//@Profile("testing")
 public class TestOrderDispatcher implements OrderDispatcher {
 
     private static final Logger logger = LoggerFactory.getLogger(TestOrderDispatcher.class);
