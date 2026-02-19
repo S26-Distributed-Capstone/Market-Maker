@@ -1,5 +1,6 @@
 package edu.yu.marketmaker.model;
 
+import java.io.Serializable;
 import java.util.UUID;
 
 /**
@@ -11,7 +12,7 @@ import java.util.UUID;
  * @param limitPrice maximum price for buy, minimum price for sell
  * @param side buy or sell
  */
-public record ExternalOrder(UUID id, String symbol, int quantity, double limitPrice, Side side) implements Identifiable<UUID> {
+public record ExternalOrder(UUID id, String symbol, int quantity, double limitPrice, Side side) implements Identifiable<UUID>, Serializable {
 
     @Override
     public UUID getId() {

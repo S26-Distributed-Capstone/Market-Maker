@@ -5,7 +5,6 @@ import edu.yu.marketmaker.model.Quote;
 
 import java.util.Collection;
 import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -13,24 +12,27 @@ import java.util.stream.Collectors;
  * This class bridges the Hazelcast IMap with PostgreSQL persistence
  * by converting between Quote records and QuoteEntity objects.
  */
-public class QuoteMapStore implements MapStore<UUID, Quote> {
+public class QuoteMapStore implements MapStore<String, Quote> {
 
-    private final BaseJpaRepository<QuoteEntity, UUID> repository;
+    private final BaseJpaRepository<QuoteEntity, String> repository;
+    private final edu.yu.marketmaker.persistence.interfaces.JpaQuoteRepository quoteRepository;
 
-    public QuoteMapStore(BaseJpaRepository<QuoteEntity, UUID> repository) {
+    public QuoteMapStore(edu.yu.marketmaker.persistence.interfaces.JpaQuoteRepository repository) {
         this.repository = repository;
+        this.quoteRepository = repository;
     }
 
     // --- MapStore Write Methods ---
 
     @Override
-    public void store(UUID key, Quote quote) {
+    public void store(String key, Quote quote) {
+        // We use the UUID from the record for persistence identity
         QuoteEntity entity = QuoteEntity.fromRecord(quote);
         repository.save(entity);
     }
 
     @Override
-    public void storeAll(Map<UUID, Quote> map) {
+    public void storeAll(Map<String, Quote> map) {
         var entities = map.values().stream()
                 .map(QuoteEntity::fromRecord)
                 .collect(Collectors.toList());
@@ -38,37 +40,38 @@ public class QuoteMapStore implements MapStore<UUID, Quote> {
     }
 
     @Override
-    public void delete(UUID key) {
-        repository.deleteById(key);
+    public void delete(String key) {
+        quoteRepository.deleteBySymbol(key);
     }
 
     @Override
-    public void deleteAll(Collection<UUID> keys) {
-        repository.deleteAllById(keys);
+    public void deleteAll(Collection<String> keys) {
+        // Inefficient but functional default; optimize with a custom query if needed
+        keys.forEach(quoteRepository::deleteBySymbol);
     }
 
     // --- MapLoader Read Methods ---
 
     @Override
-    public Quote load(UUID key) {
-        return repository.findById(key)
+    public Quote load(String key) {
+        return quoteRepository.findBySymbol(key)
                 .map(QuoteEntity::toRecord)
                 .orElse(null);
     }
 
     @Override
-    public Map<UUID, Quote> loadAll(Collection<UUID> keys) {
-        return repository.findAllById(keys).stream()
+    public Map<String, Quote> loadAll(Collection<String> keys) {
+        return quoteRepository.findAllBySymbolIn(keys).stream()
                 .collect(Collectors.toMap(
-                        QuoteEntity::getQuoteId,
+                        QuoteEntity::getSymbol,
                         QuoteEntity::toRecord
                 ));
     }
 
     @Override
-    public Iterable<UUID> loadAllKeys() {
+    public Iterable<String> loadAllKeys() {
         return repository.findAll().stream()
-                .map(QuoteEntity::getQuoteId)
+                .map(QuoteEntity::getSymbol)
                 .collect(Collectors.toList());
     }
 }

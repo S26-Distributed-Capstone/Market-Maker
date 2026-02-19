@@ -14,7 +14,7 @@ import edu.yu.marketmaker.memory.Repository;
 import edu.yu.marketmaker.model.Quote;
 
 @Component
-@Profile("exchange")
+@Profile("testing")
 public class StaticQuoteRepository implements Repository<String, Quote> {
 
     private final Map<String, Quote> map = new ConcurrentHashMap<>();

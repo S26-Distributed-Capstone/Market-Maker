@@ -195,7 +195,7 @@ public class HazelcastConfig {
      */
     @Bean
     public Repository<String, Quote> quoteRepository(IMap<String, Quote> quotesMap) {
-        return new StaticQuoteRepository();
+        return new HazelcastRepository<>(quotesMap);
     }
 
     /**

@@ -1,5 +1,6 @@
 package edu.yu.marketmaker.model;
 
+import java.io.Serializable;
 import java.util.UUID;
 
 /**
@@ -11,7 +12,7 @@ import java.util.UUID;
  * @param version monotonic per symbol
  * @param lastFillId
  */
-public record Position(String symbol, int netQuantity, long version, UUID lastFillId) implements Identifiable<String> {
+public record Position(String symbol, int netQuantity, long version, UUID lastFillId) implements Identifiable<String>, Serializable {
 
     @Override
     public String getId() {
