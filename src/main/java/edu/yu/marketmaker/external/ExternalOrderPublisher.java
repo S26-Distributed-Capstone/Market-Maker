@@ -4,8 +4,8 @@ import edu.yu.marketmaker.model.ExternalOrder;
 import edu.yu.marketmaker.model.Side;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.net.URI;
@@ -56,14 +56,14 @@ public class ExternalOrderPublisher {
         logger.info("Submitting {} order: {} x {} @ {}",
                 order.side(), order.symbol(), order.quantity(), order.limitPrice());
 
-        ObjectMapper mapper = JsonMapper
-                .builder()
-                .findAndAddModules()
-                .build();
-        String serializedOrder = mapper.writeValueAsString(order);
+        ObjectMapper mapper = JsonMapper.builder().findAndAddModules().build();
 
-        this.httpConnection.sendData(serializedOrder);
-    }
+        try {
+            String serializedOrder = mapper.writeValueAsString(order);
+            this.httpConnection.sendData(serializedOrder);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            logger.error("Failed to serialize order to JSON: {}", order, e);
+        }    }
 
     /**
      * Generate and submit random orders continuously.

@@ -1,8 +1,9 @@
 services:
   app:
+    build: .
+    image: market-maker:latest
     environment:
       - SPRING_PROFILES_ACTIVE=exchange
-    image: market-maker
     ports:
       - "8080:8080"
     depends_on:
