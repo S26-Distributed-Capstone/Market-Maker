@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
 
+import edu.yu.marketmaker.memory.Repository;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
@@ -13,7 +14,7 @@ import edu.yu.marketmaker.model.Position;
 
 @Component
 @Profile("testing")
-public class StaticPositionRepository implements PositionRepository {
+public class StaticPositionRepository implements Repository<String, Position> {
 
     private final Map<String, Position> map;
 
@@ -26,18 +27,23 @@ public class StaticPositionRepository implements PositionRepository {
     }
 
     @Override
-    public Optional<Position> getPosition(String token) {
-        return Optional.ofNullable(map.get(token));
+    public Optional<Position> get(String id) {
+        return Optional.ofNullable(map.get(id));
     }
 
     @Override
-    public void putPosition(Position position) {
+    public void put(Position position) {
         map.put(position.symbol(), position);
     }
 
     @Override
-    public java.util.Collection<Position> getAllPositions() {
+    public java.util.Collection<Position> getAll() {
         return map.values();
+    }
+
+    @Override
+    public void delete(String id) {
+        map.remove(id);
     }
 
     private static Map<String, Position> generatePositions(Random random) {

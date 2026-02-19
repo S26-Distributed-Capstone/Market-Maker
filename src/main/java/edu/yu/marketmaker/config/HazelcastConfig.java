@@ -1,0 +1,216 @@
+package edu.yu.marketmaker.config;
+
+import com.hazelcast.config.*;
+import com.hazelcast.core.Hazelcast;
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.map.IMap;
+import edu.yu.marketmaker.exchange.*;
+import edu.yu.marketmaker.memory.HazelcastRepository;
+import edu.yu.marketmaker.memory.Repository;
+import edu.yu.marketmaker.model.*;
+import edu.yu.marketmaker.persistence.*;
+import edu.yu.marketmaker.persistence.interfaces.*;
+import org.springframework.context.annotation.*;
+
+import java.util.UUID;
+
+/**
+ * Hazelcast configuration for the Market Maker application.
+ * Configures an embedded Hazelcast instance with MapStores
+ * backed by PostgreSQL for data persistence.
+ */
+@Configuration
+@Profile("exchange")
+public class HazelcastConfig {
+
+    private static final String POSITIONS_MAP_NAME = "positions";
+    private static final String FILLS_MAP_NAME = "fills";
+    private static final String QUOTES_MAP_NAME = "quotes";
+    private static final String EXTERNAL_ORDERS_MAP_NAME = "external-orders";
+    private static final String RESERVATIONS_MAP_NAME = "reservations";
+
+    @Bean
+    public HazelcastInstance hazelcastInstance(
+            JpaPositionRepository positionRepository,
+            JpaFillRepository fillRepository,
+            JpaQuoteRepository quoteRepository,
+            JpaExternalOrderRepository externalOrderRepository,
+            JpaReservationRepository reservationRepository) {
+
+        Config config = new Config();
+        config.setInstanceName("market-maker-hazelcast");
+
+        // Configure all maps with MapStores
+        config.addMapConfig(createPositionsMapConfig(positionRepository));
+        config.addMapConfig(createFillsMapConfig(fillRepository));
+        config.addMapConfig(createQuotesMapConfig(quoteRepository));
+        config.addMapConfig(createExternalOrdersMapConfig(externalOrderRepository));
+        config.addMapConfig(createReservationsMapConfig(reservationRepository));
+
+        // Network configuration for embedded mode
+        configureNetwork(config);
+
+        return Hazelcast.newHazelcastInstance(config);
+    }
+
+    private MapConfig createPositionsMapConfig(JpaPositionRepository repository) {
+        MapConfig mapConfig = new MapConfig(POSITIONS_MAP_NAME);
+        configureMapStore(mapConfig, new PositionMapStore(repository));
+        return mapConfig;
+    }
+
+    private MapConfig createFillsMapConfig(JpaFillRepository repository) {
+        MapConfig mapConfig = new MapConfig(FILLS_MAP_NAME);
+        configureMapStore(mapConfig, new FillMapStore(repository));
+        return mapConfig;
+    }
+
+    private MapConfig createQuotesMapConfig(JpaQuoteRepository repository) {
+        MapConfig mapConfig = new MapConfig(QUOTES_MAP_NAME);
+        configureMapStore(mapConfig, new QuoteMapStore(repository));
+        return mapConfig;
+    }
+
+    private MapConfig createExternalOrdersMapConfig(JpaExternalOrderRepository repository) {
+        MapConfig mapConfig = new MapConfig(EXTERNAL_ORDERS_MAP_NAME);
+        configureMapStore(mapConfig, new ExternalOrderMapStore(repository));
+        return mapConfig;
+    }
+
+    private MapConfig createReservationsMapConfig(JpaReservationRepository repository) {
+        MapConfig mapConfig = new MapConfig(RESERVATIONS_MAP_NAME);
+        configureMapStore(mapConfig, new ReservationMapStore(repository));
+        return mapConfig;
+    }
+
+    private void configureMapStore(MapConfig mapConfig, Object mapStoreImpl) {
+        MapStoreConfig mapStoreConfig = new MapStoreConfig();
+        mapStoreConfig.setImplementation(mapStoreImpl);
+        mapStoreConfig.setEnabled(true);
+
+        // Write-behind configuration for better performance
+        // Writes are batched and flushed to DB asynchronously
+        mapStoreConfig.setWriteDelaySeconds(0); // 0 for write-through, >0 for write-behind
+        mapStoreConfig.setWriteBatchSize(100);
+        mapStoreConfig.setWriteCoalescing(true);
+
+        // Load all keys on startup
+        mapStoreConfig.setInitialLoadMode(MapStoreConfig.InitialLoadMode.EAGER);
+
+        mapConfig.setMapStoreConfig(mapStoreConfig);
+
+        // Eviction policy - keep all data in memory (no eviction)
+        EvictionConfig evictionConfig = new EvictionConfig();
+        evictionConfig.setEvictionPolicy(EvictionPolicy.NONE);
+        evictionConfig.setMaxSizePolicy(MaxSizePolicy.PER_NODE);
+        mapConfig.setEvictionConfig(evictionConfig);
+
+        // Backup configuration
+        mapConfig.setBackupCount(1);
+        mapConfig.setAsyncBackupCount(0);
+    }
+
+    private void configureNetwork(Config config) {
+        NetworkConfig networkConfig = config.getNetworkConfig();
+
+        // Join configuration - using multicast for development
+        // For production, consider TCP-IP or Kubernetes discovery
+        JoinConfig joinConfig = networkConfig.getJoin();
+        joinConfig.getMulticastConfig().setEnabled(true);
+        joinConfig.getTcpIpConfig().setEnabled(false);
+    }
+
+    // --- IMap Beans for Dependency Injection ---
+
+    @Bean
+    public OrderDispatcher orderDispatcher(OrderDispatcher orderDispatcher) {
+        return new TestOrderDispatcher();
+    }
+
+    @Bean
+    public OrderValidator orderValidator(OrderValidator orderValidator) {
+        return new BasicOrderValidator();
+    }
+
+    /**
+     * Provides the positions IMap for dependency injection.
+     */
+    @Bean
+    public com.hazelcast.map.IMap<String, Position> positionsMap(HazelcastInstance hazelcastInstance) {
+        return hazelcastInstance.getMap(POSITIONS_MAP_NAME);
+    }
+
+    /**
+     * Provides the fills IMap for dependency injection.
+     */
+    @Bean
+    public com.hazelcast.map.IMap<UUID, Fill> fillsMap(HazelcastInstance hazelcastInstance) {
+        return hazelcastInstance.getMap(FILLS_MAP_NAME);
+    }
+
+    /**
+     * Provides the quotes IMap for dependency injection.
+     */
+    @Bean
+    public com.hazelcast.map.IMap<String, Quote> quotesMap(HazelcastInstance hazelcastInstance) {
+        return hazelcastInstance.getMap(QUOTES_MAP_NAME);
+    }
+
+    /**
+     * Provides the external orders IMap for dependency injection.
+     */
+    @Bean
+    public com.hazelcast.map.IMap<UUID, ExternalOrder> externalOrdersMap(HazelcastInstance hazelcastInstance) {
+        return hazelcastInstance.getMap(EXTERNAL_ORDERS_MAP_NAME);
+    }
+
+    /**
+     * Provides the reservations IMap for dependency injection.
+     */
+    @Bean
+    public com.hazelcast.map.IMap<UUID, Reservation> reservationsMap(HazelcastInstance hazelcastInstance) {
+        return hazelcastInstance.getMap(RESERVATIONS_MAP_NAME);
+    }
+
+    // --- Repository Beans using Generic HazelcastRepository ---
+
+    /**
+     * Provides the Position repository for dependency injection.
+     */
+    @Bean
+    public Repository<String, Position> positionRepository(IMap<String, Position> positionsMap) {
+        return new HazelcastRepository<>(positionsMap);
+    }
+
+    /**
+     * Provides the Fill repository for dependency injection.
+     */
+    @Bean
+    public Repository<UUID, Fill> fillRepository(IMap<UUID, Fill> fillsMap) {
+        return new HazelcastRepository<>(fillsMap);
+    }
+
+    /**
+     * Provides the Quote repository for dependency injection.
+     */
+    @Bean
+    public Repository<String, Quote> quoteRepository(IMap<String, Quote> quotesMap) {
+        return new HazelcastRepository<>(quotesMap);
+    }
+
+    /**
+     * Provides the ExternalOrder repository for dependency injection.
+     */
+    @Bean
+    public Repository<UUID, ExternalOrder> externalOrderRepository(IMap<UUID, ExternalOrder> externalOrdersMap) {
+        return new HazelcastRepository<>(externalOrdersMap);
+    }
+
+    /**
+     * Provides the Reservation repository for dependency injection.
+     */
+    @Bean
+    public Repository<UUID, Reservation> reservationRepository(IMap<UUID, Reservation> reservationsMap) {
+        return new HazelcastRepository<>(reservationsMap);
+    }
+}

@@ -4,5 +4,5 @@ import edu.yu.marketmaker.model.ExternalOrder;
 
 public interface OrderValidator {
     
-    void validateOrder(QuoteRepository repository, ExternalOrder order) throws OrderValidationException;
+    void validateOrder(ExternalOrder order) throws OrderValidationException;
 }
