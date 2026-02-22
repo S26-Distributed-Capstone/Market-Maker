@@ -39,11 +39,11 @@ public class TradingStateService {
     ResponseEntity<Void> submitFill(@RequestBody Fill fill) {
         try {
             Optional<Position> position = positionRepository.get(fill.symbol());
-            if(position.isEmpty() && fill.side() == Side.SELL){
+            if(position.isEmpty() && fill.side() == Side.SELL){//reject if selling with no position, should never be reached
                 return ResponseEntity.badRequest().build();
             }
             fillRepository.put(fill);
-            int quantity = fill.side() == Side.BUY ? fill.quantity() : -fill.quantity();
+            int quantity = fill.side() == Side.BUY ? fill.quantity() : -fill.quantity();//net difference
             if (position.isPresent()) {
                 int newQuantity = position.get().netQuantity() + quantity;
                 positionRepository.put(new Position(fill.symbol(), newQuantity, position.get().version()+1, fill.getId()));
