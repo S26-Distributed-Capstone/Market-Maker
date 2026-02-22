@@ -8,13 +8,16 @@ import edu.yu.marketmaker.model.Position;
 import edu.yu.marketmaker.model.Side;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
 import java.util.Collection;
@@ -45,44 +48,71 @@ public class TradingStateService {
     }
 
     /**
-     * Method to submit a fill.
-     * After persisting the fill and updating the position the new
-     * {@link StateSnapshot} is broadcast to all active RSocket subscribers.
+     * HTTP: submit a fill via POST /state/fills
      *
      * @param fill the fill to record
      */
     @PostMapping("/state/fills")
     ResponseEntity<Void> submitFill(@RequestBody Fill fill) {
         try {
-            Optional<Position> position = positionRepository.get(fill.symbol());
-            if (position.isEmpty() && fill.side() == Side.SELL) { // reject if selling with no position
-                return ResponseEntity.badRequest().build();
-            }
-            fillRepository.put(fill);
-            int quantity = fill.side() == Side.BUY ? fill.quantity() : -fill.quantity();
-            Position updatedPosition;
-            if (position.isPresent()) {
-                int newQuantity = position.get().netQuantity() + quantity;
-                updatedPosition = new Position(fill.symbol(), newQuantity, position.get().version() + 1, fill.getId());
-            } else {
-                updatedPosition = new Position(fill.symbol(), quantity, 0, fill.getId());
-            }
-            positionRepository.put(updatedPosition);
-
-            // Broadcast to all active streamState subscribers
-            Collection<Fill> symbolFills = fillRepository.getAll().stream()
-                    .filter(f -> f.symbol().equals(updatedPosition.symbol()))
-                    .toList();
-            positionSink.tryEmitNext(new StateSnapshot(updatedPosition, symbolFills));
-
+            processFill(fill);
             return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
         } catch (HazelcastException e) {
             return ResponseEntity.internalServerError().build();
         }
     }
 
     /**
-     * Get all current positions.
+     * TCP/RSocket: submit a fill via request-response on route {@code "state.fills"}.
+     *
+     * @param fill the fill to record
+     * @return {@link Mono} that completes empty on success, or errors on invalid input
+     */
+    @MessageMapping("state.fills")
+    public Mono<Void> submitFillRSocket(@Payload Fill fill) {
+        try {
+            processFill(fill);
+            return Mono.empty();
+        } catch (IllegalArgumentException | HazelcastException e) {
+            return Mono.error(e);
+        }
+    }
+
+    /**
+     * Shared logic for both HTTP and RSocket submitFill endpoints.
+     * Validates the fill, persists it, updates the position, and broadcasts
+     * a {@link StateSnapshot} to all active {@code state.stream} subscribers.
+     *
+     * @param fill the fill to process
+     * @throws IllegalArgumentException if selling with no existing position
+     * @throws HazelcastException       if the underlying repository fails
+     */
+    private void processFill(Fill fill) {
+        Optional<Position> position = positionRepository.get(fill.symbol());
+        if (position.isEmpty() && fill.side() == Side.SELL) {
+            throw new IllegalArgumentException("Cannot sell with no existing position for: " + fill.symbol());
+        }
+        fillRepository.put(fill);
+        int quantity = fill.side() == Side.BUY ? fill.quantity() : -fill.quantity();
+        Position updatedPosition;
+        if (position.isPresent()) {
+            int newQuantity = position.get().netQuantity() + quantity;
+            updatedPosition = new Position(fill.symbol(), newQuantity, position.get().version() + 1, fill.getId());
+        } else {
+            updatedPosition = new Position(fill.symbol(), quantity, 0, fill.getId());
+        }
+        positionRepository.put(updatedPosition);
+
+        Collection<Fill> symbolFills = fillRepository.getAll().stream()
+                .filter(f -> f.symbol().equals(updatedPosition.symbol()))
+                .toList();
+        positionSink.tryEmitNext(new StateSnapshot(updatedPosition, symbolFills));
+    }
+
+    /**
+     * HTTP: get all current positions via GET /positions
      *
      * @return a collection of positions
      */
@@ -92,7 +122,18 @@ public class TradingStateService {
     }
 
     /**
-     * Get a specific position based on inputted symbol.
+     * TCP/RSocket: get all current positions via request-stream on route {@code "positions"}.
+     * Each position is emitted as a separate item, then the stream completes.
+     *
+     * @return a {@link Flux} that emits every current {@link Position} and then completes
+     */
+    @MessageMapping("positions")
+    public Flux<Position> getAllPositionsRSocket() {
+        return Flux.fromIterable(positionRepository.getAll());
+    }
+
+    /**
+     * HTTP: get a specific position via GET /positions/{symbol}
      *
      * @param symbol ticker symbol
      * @return the position, if present
@@ -100,6 +141,21 @@ public class TradingStateService {
     @GetMapping("/positions/{symbol}")
     Optional<Position> getPosition(@PathVariable String symbol) {
         return positionRepository.get(symbol);
+    }
+
+    /**
+     * TCP/RSocket: get a specific position via request-response on route
+     * {@code "positions.{symbol}"}.
+     * Example route: {@code "positions.AAPL"}
+     *
+     * @param symbol ticker symbol extracted from the route
+     * @return a {@link Mono} emitting the {@link Position}, or empty if not found
+     */
+    @MessageMapping("positions.{symbol}")
+    public Mono<Position> getPositionRSocket(@DestinationVariable String symbol) {
+        return positionRepository.get(symbol)
+                .map(Mono::just)
+                .orElse(Mono.empty());
     }
 
     /**
