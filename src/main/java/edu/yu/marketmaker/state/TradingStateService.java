@@ -6,6 +6,7 @@ import edu.yu.marketmaker.model.Fill;
 import edu.yu.marketmaker.model.Position;
 
 import edu.yu.marketmaker.model.Side;
+import edu.yu.marketmaker.service.ServiceHealth;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
@@ -193,5 +194,10 @@ public class TradingStateService {
      * @param fills    all fills recorded for that symbol
      */
     public record StateSnapshot(Position position, Collection<Fill> fills) {}
+
+    @GetMapping("/health")
+    ServiceHealth getHealth() {
+        return new ServiceHealth(true, 0, "Trading State Service");
+    }
 
 }
