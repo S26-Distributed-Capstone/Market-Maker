@@ -12,9 +12,11 @@ import edu.yu.marketmaker.model.Side;
 public class FillOrderDispatcher implements OrderDispatcher {
 
     private final Repository<String, Quote> quoteRepository;
+    private final FillSender fillSender;
 
-    public FillOrderDispatcher(Repository<String, Quote> repository) {
+    public FillOrderDispatcher(Repository<String, Quote> repository, FillSender fillSender) {
         this.quoteRepository = repository;
+        this.fillSender = fillSender;
     }
 
     @Override
@@ -45,7 +47,7 @@ public class FillOrderDispatcher implements OrderDispatcher {
             throw new OrderValidationException("Order could not be filled");
         }
         Fill fill = new Fill(order.id(), order.symbol(), order.side(), adjustedQuantity, price, null, timestamp);
-        // TODO: send fill to trading service
+        fillSender.sendFill(fill);
     }
 
     private int adjustQuantity(Quote quote, ExternalOrder order) {
