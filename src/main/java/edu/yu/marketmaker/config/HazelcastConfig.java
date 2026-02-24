@@ -205,12 +205,4 @@ public class HazelcastConfig {
     public Repository<UUID, ExternalOrder> externalOrderRepository(IMap<UUID, ExternalOrder> externalOrdersMap) {
         return new HazelcastRepository<>(externalOrdersMap);
     }
-
-    /**
-     * Provides the Reservation repository for dependency injection.
-     */
-    @Bean
-    public Repository<UUID, Reservation> reservationRepository(IMap<UUID, Reservation> reservationsMap) {
-        return new HazelcastRepository<>(reservationsMap);
-    }
 }
