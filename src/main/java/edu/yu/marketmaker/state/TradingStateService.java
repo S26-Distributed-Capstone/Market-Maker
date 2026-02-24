@@ -1,18 +1,29 @@
 package edu.yu.marketmaker.state;
 
+import com.hazelcast.core.HazelcastException;
 import edu.yu.marketmaker.memory.Repository;
 import edu.yu.marketmaker.model.Fill;
 import edu.yu.marketmaker.model.Position;
 
+import edu.yu.marketmaker.model.Side;
+import edu.yu.marketmaker.service.ServiceHealth;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.handler.annotation.DestinationVariable;
+import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 
 import java.util.Collection;
 import java.util.Optional;
+import java.util.UUID;
 
 
 @RestController
@@ -20,22 +31,90 @@ import java.util.Optional;
 public class TradingStateService {
 
     private final Repository<String, Position> positionRepository;
+    private final Repository<UUID, Fill> fillRepository;
 
-    public TradingStateService(Repository<String, Position> positionRepository) {
+    /**
+     * Hot multicast sink – every call to {@code submitFill} that results in a
+     * position change emits one {@link StateSnapshot} here.  All active
+     * {@code streamState} subscribers receive the event in real time.
+     * {@code onBackpressureBuffer} keeps a small history so a slow subscriber
+     * does not block the publisher.
+     */
+    private final Sinks.Many<StateSnapshot> positionSink =
+            Sinks.many().multicast().onBackpressureBuffer();
+
+    public TradingStateService(Repository<String, Position> positionRepository, Repository<UUID, Fill> fillRepository) {
         this.positionRepository = positionRepository;
+        this.fillRepository = fillRepository;
     }
 
     /**
-     * Method to submit a fill
-     * @param fill
+     * HTTP: submit a fill via POST /state/fills
+     *
+     * @param fill the fill to record
      */
     @PostMapping("/state/fills")
-    void submitFill(@RequestBody Fill fill) {
-        // TODO: Implement fill processing logic
+    ResponseEntity<Void> submitFill(@RequestBody Fill fill) {
+        try {
+            processFill(fill);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (HazelcastException e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     /**
-     * Get all current positions
+     * TCP/RSocket: submit a fill via request-response on route {@code "state.fills"}.
+     *
+     * @param fill the fill to record
+     * @return {@link Mono} that completes empty on success, or errors on invalid input
+     */
+    @MessageMapping("state.fills")
+    public Mono<Void> submitFillRSocket(@Payload Fill fill) {
+        try {
+            processFill(fill);
+            return Mono.empty();
+        } catch (IllegalArgumentException | HazelcastException e) {
+            return Mono.error(e);
+        }
+    }
+
+    /**
+     * Shared logic for both HTTP and RSocket submitFill endpoints.
+     * Validates the fill, persists it, updates the position, and broadcasts
+     * a {@link StateSnapshot} to all active {@code state.stream} subscribers.
+     *
+     * @param fill the fill to process
+     * @throws IllegalArgumentException if selling with no existing position
+     * @throws HazelcastException       if the underlying repository fails
+     */
+    private void processFill(Fill fill) {
+        Optional<Position> position = positionRepository.get(fill.symbol());
+        if (position.isEmpty() && fill.side() == Side.SELL) {
+            throw new IllegalArgumentException("Cannot sell with no existing position for: " + fill.symbol());
+        }
+        fillRepository.put(fill);
+        int quantity = fill.side() == Side.BUY ? fill.quantity() : -fill.quantity();
+        Position updatedPosition;
+        if (position.isPresent()) {
+            int newQuantity = position.get().netQuantity() + quantity;
+            updatedPosition = new Position(fill.symbol(), newQuantity, position.get().version() + 1, fill.getId());
+        } else {
+            updatedPosition = new Position(fill.symbol(), quantity, 0, fill.getId());
+        }
+        positionRepository.put(updatedPosition);
+
+        Collection<Fill> symbolFills = fillRepository.getAll().stream()
+                .filter(f -> f.symbol().equals(updatedPosition.symbol()))
+                .toList();
+        positionSink.tryEmitNext(new StateSnapshot(updatedPosition, symbolFills));
+    }
+
+    /**
+     * HTTP: get all current positions via GET /positions
+     *
      * @return a collection of positions
      */
     @GetMapping("/positions")
@@ -44,13 +123,81 @@ public class TradingStateService {
     }
 
     /**
-     * Get a specific position based on inputted symbol
-     * @param symbol
-     * @return
+     * TCP/RSocket: get all current positions via request-stream on route {@code "positions"}.
+     * Each position is emitted as a separate item, then the stream completes.
+     *
+     * @return a {@link Flux} that emits every current {@link Position} and then completes
+     */
+    @MessageMapping("positions")
+    public Flux<Position> getAllPositionsRSocket() {
+        return Flux.fromIterable(positionRepository.getAll());
+    }
+
+    /**
+     * HTTP: get a specific position via GET /positions/{symbol}
+     *
+     * @param symbol ticker symbol
+     * @return the position, if present
      */
     @GetMapping("/positions/{symbol}")
     Optional<Position> getPosition(@PathVariable String symbol) {
         return positionRepository.get(symbol);
+    }
+
+    /**
+     * TCP/RSocket: get a specific position via request-response on route
+     * {@code "positions.{symbol}"}.
+     * Example route: {@code "positions.AAPL"}
+     *
+     * @param symbol ticker symbol extracted from the route
+     * @return a {@link Mono} emitting the {@link Position}, or empty if not found
+     */
+    @MessageMapping("positions.{symbol}")
+    public Mono<Position> getPositionRSocket(@DestinationVariable String symbol) {
+        return positionRepository.get(symbol)
+                .map(Mono::just)
+                .orElse(Mono.empty());
+    }
+
+    /**
+     * RSocket request-stream endpoint.
+     * Connect via TCP to port 7000 ({@code spring.rsocket.server.port}) and
+     * send route {@code "state.stream"}.
+     * <p>
+     * The subscriber first receives a {@link StateSnapshot} for every position
+     * that already exists at subscription time (the current snapshot), and then
+     * continues to receive a new {@link StateSnapshot} every time a fill is
+     * submitted that updates a position – i.e. the stream never completes while
+     * the connection is open.
+     *
+     * @return a hot {@link Flux} of {@link StateSnapshot} items
+     */
+    @MessageMapping("state.stream")
+    public Flux<StateSnapshot> streamPositions() {
+        // Emit current state first, then keep streaming live updates
+        Flux<StateSnapshot> currentState = Flux.fromIterable(positionRepository.getAll())
+                .map(position -> {
+                    Collection<Fill> fills = fillRepository.getAll().stream()
+                            .filter(f -> f.symbol().equals(position.symbol()))
+                            .toList();
+                    return new StateSnapshot(position, fills);
+                });
+
+        return currentState.concatWith(positionSink.asFlux());
+    }
+
+    /**
+     * A snapshot of a single position together with all fills that contributed
+     * to it.  Sent as individual stream items to RSocket subscribers.
+     *
+     * @param position the current net position for a symbol
+     * @param fills    all fills recorded for that symbol
+     */
+    public record StateSnapshot(Position position, Collection<Fill> fills) {}
+
+    @GetMapping("/health")
+    ServiceHealth getHealth() {
+        return new ServiceHealth(true, 0, "Trading State Service");
     }
 
 }
