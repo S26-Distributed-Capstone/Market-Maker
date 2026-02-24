@@ -1,5 +1,6 @@
 package edu.yu.marketmaker.exposurereservation;
 
+import edu.yu.marketmaker.memory.Repository;
 import edu.yu.marketmaker.model.*;
 
 import java.util.*;
@@ -11,12 +12,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * applying fills to reduce open exposure, and releasing unused reservations.
  */
 public class ExposureReservationService {
-    private final ReservationRepository repo;
+    private final Repository<UUID, Reservation> repo;
     // Simple global capacity per symbol mock
     private final Map<String, Integer> capacityConfig = new ConcurrentHashMap<>();
     private static final int DEFAULT_CAPACITY = 10000;
+    private static final int GLOBAL_HARD_LIMIT = 100;
 
-    public ExposureReservationService(ReservationRepository repo) {
+    public ExposureReservationService(Repository<UUID, Reservation> repo) {
         this.repo = repo;
     }
 
@@ -28,22 +30,36 @@ public class ExposureReservationService {
      * @return The response containing the reservation ID and the actual granted quantity.
      */
     public synchronized ReservationResponse createReservation(Quote quote) {
-        int limit = capacityConfig.getOrDefault(quote.symbol(), DEFAULT_CAPACITY);
-        int currentUsage = repo.findAll().stream()
+        // Enforce the red line: limit is the stricter of config or absolute max
+        int configured = capacityConfig.getOrDefault(quote.symbol(), DEFAULT_CAPACITY);
+        // The hard limit logic (100) ensures we never reserve past this amount globally/per symbol
+        int limit = Math.min(configured, GLOBAL_HARD_LIMIT);
+
+        // Calculate total currently granted exposure for this symbol by summing all active reservations
+        int currentUsage = repo.getAll().stream()
                 .filter(r -> r.symbol().equals(quote.symbol()))
                 .mapToInt(Reservation::granted)
                 .sum();
 
+        // Calculate what is remaining
         int available = Math.max(0, limit - currentUsage);
-        int granted = Math.min(quote.askQuantity(), available);
+
+        // Determine request size (using greater of bid/ask if bidirectional, or just ask as per previous code)
+        // Assuming strict ask-side reservation based on previous code:
+        int requestedQty = Math.max(0, quote.askQuantity());
+
+        // Grant only what is available, never exceeding the limit
+        int granted = Math.min(requestedQty, available);
 
         ReservationStatus status;
-        if (granted == 0 && quote.askQuantity() > 0) status = ReservationStatus.DENIED;
-        else if (granted < quote.askQuantity()) status = ReservationStatus.PARTIAL;
+        if (granted == 0 && requestedQty > 0) status = ReservationStatus.DENIED;
+        else if (granted < requestedQty) status = ReservationStatus.PARTIAL;
         else status = ReservationStatus.GRANTED;
 
-        Reservation r = new Reservation(UUID.randomUUID(), quote.symbol(), quote.askQuantity(), granted, status);
-        repo.save(r);
+        Reservation r = new Reservation(UUID.randomUUID(), quote.symbol(), requestedQty, granted, status);
+
+        // Save the reservation to "lock in" this exposure usage for future requests
+        repo.put(r);
 
         return new ReservationResponse(r.id(), r.status(), r.granted());
     }
@@ -59,7 +75,7 @@ public class ExposureReservationService {
      * @throws RuntimeException if the reservation is not found.
      */
     public synchronized int applyFill(UUID id, int filledQty) {
-        Reservation r = repo.findById(id).orElseThrow(() -> new RuntimeException("Reservation not found"));
+        Reservation r = repo.get(id).orElseThrow(() -> new RuntimeException("Reservation not found"));
         return reduceGrantOnFill(r, filledQty);
     }
 
@@ -72,7 +88,7 @@ public class ExposureReservationService {
      * @throws RuntimeException if the reservation is not found.
      */
     public synchronized int release(UUID id) {
-        Reservation r = repo.findById(id).orElseThrow(() -> new RuntimeException("Reservation not found"));
+        Reservation r = repo.get(id).orElseThrow(() -> new RuntimeException("Reservation not found"));
         return releaseRemaining(r);
     }
 
@@ -90,7 +106,7 @@ public class ExposureReservationService {
 
         // Update record
         Reservation updated = new Reservation(r.id(), r.symbol(), r.requested(), newGranted, r.status());
-        repo.save(updated);
+        repo.put(updated);
 
         return toFree;
     }
@@ -106,7 +122,7 @@ public class ExposureReservationService {
 
         // Update record
         Reservation updated = new Reservation(r.id(), r.symbol(), r.requested(), 0, r.status());
-        repo.save(updated);
+        repo.put(updated);
 
         return toFree;
     }
@@ -117,8 +133,8 @@ public class ExposureReservationService {
      * @return Snapshot of usage, capacity, and active count.
      */
     public ExposureState getExposureState() {
-        int totalUsage = repo.findAll().stream().mapToInt(Reservation::granted).sum();
-        int activeCount = (int) repo.findAll().stream().filter(r -> r.granted() > 0).count();
+        int totalUsage = repo.getAll().stream().mapToInt(Reservation::granted).sum();
+        int activeCount = (int) repo.getAll().stream().filter(r -> r.granted() > 0).count();
         // Summing default capacity for illustration, essentially assuming 1 symbol or simplified view
         return new ExposureState(totalUsage, DEFAULT_CAPACITY, activeCount);
     }

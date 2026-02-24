@@ -1,5 +1,6 @@
 services:
   app:
+    build: .
     environment:
       - SPRING_PROFILES_ACTIVE=exchange
     image: market-maker
