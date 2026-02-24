@@ -4,7 +4,6 @@ import com.hazelcast.config.*;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
-import edu.yu.marketmaker.exchange.*;
 import edu.yu.marketmaker.memory.HazelcastRepository;
 import edu.yu.marketmaker.memory.Repository;
 import edu.yu.marketmaker.model.*;
@@ -20,7 +19,6 @@ import java.util.UUID;
  * backed by PostgreSQL for data persistence.
  */
 @Configuration
-@Profile("exchange")
 public class HazelcastConfig {
 
     private static final String POSITIONS_MAP_NAME = "positions";
@@ -122,21 +120,12 @@ public class HazelcastConfig {
 
     // --- IMap Beans for Dependency Injection ---
 
-    @Bean
-    public OrderDispatcher orderDispatcher(OrderDispatcher orderDispatcher) {
-        return new TestOrderDispatcher();
-    }
-
-    @Bean
-    public OrderValidator orderValidator(OrderValidator orderValidator) {
-        return new BasicOrderValidator();
-    }
 
     /**
      * Provides the positions IMap for dependency injection.
      */
     @Bean
-    public com.hazelcast.map.IMap<String, Position> positionsMap(HazelcastInstance hazelcastInstance) {
+    public IMap<String, Position> positionsMap(HazelcastInstance hazelcastInstance) {
         return hazelcastInstance.getMap(POSITIONS_MAP_NAME);
     }
 
@@ -144,7 +133,7 @@ public class HazelcastConfig {
      * Provides the fills IMap for dependency injection.
      */
     @Bean
-    public com.hazelcast.map.IMap<UUID, Fill> fillsMap(HazelcastInstance hazelcastInstance) {
+    public IMap<UUID, Fill> fillsMap(HazelcastInstance hazelcastInstance) {
         return hazelcastInstance.getMap(FILLS_MAP_NAME);
     }
 
@@ -152,7 +141,7 @@ public class HazelcastConfig {
      * Provides the quotes IMap for dependency injection.
      */
     @Bean
-    public com.hazelcast.map.IMap<String, Quote> quotesMap(HazelcastInstance hazelcastInstance) {
+    public IMap<String, Quote> quotesMap(HazelcastInstance hazelcastInstance) {
         return hazelcastInstance.getMap(QUOTES_MAP_NAME);
     }
 
@@ -160,7 +149,7 @@ public class HazelcastConfig {
      * Provides the external orders IMap for dependency injection.
      */
     @Bean
-    public com.hazelcast.map.IMap<UUID, ExternalOrder> externalOrdersMap(HazelcastInstance hazelcastInstance) {
+    public IMap<UUID, ExternalOrder> externalOrdersMap(HazelcastInstance hazelcastInstance) {
         return hazelcastInstance.getMap(EXTERNAL_ORDERS_MAP_NAME);
     }
 
@@ -168,7 +157,7 @@ public class HazelcastConfig {
      * Provides the reservations IMap for dependency injection.
      */
     @Bean
-    public com.hazelcast.map.IMap<UUID, Reservation> reservationsMap(HazelcastInstance hazelcastInstance) {
+    public IMap<UUID, Reservation> reservationsMap(HazelcastInstance hazelcastInstance) {
         return hazelcastInstance.getMap(RESERVATIONS_MAP_NAME);
     }
 
@@ -204,13 +193,5 @@ public class HazelcastConfig {
     @Bean
     public Repository<UUID, ExternalOrder> externalOrderRepository(IMap<UUID, ExternalOrder> externalOrdersMap) {
         return new HazelcastRepository<>(externalOrdersMap);
-    }
-
-    /**
-     * Provides the Reservation repository for dependency injection.
-     */
-    @Bean
-    public Repository<UUID, Reservation> reservationRepository(IMap<UUID, Reservation> reservationsMap) {
-        return new HazelcastRepository<>(reservationsMap);
     }
 }

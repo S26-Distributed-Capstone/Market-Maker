@@ -1,5 +1,6 @@
 package edu.yu.marketmaker.exposurereservation;
 
+import edu.yu.marketmaker.memory.Repository;
 import edu.yu.marketmaker.model.*;
 
 import org.springframework.context.annotation.Profile;
@@ -18,9 +19,9 @@ public class ExposureReservationAPI {
 
     private final ExposureReservationService service;
 
-    public ExposureReservationAPI() {
+    public ExposureReservationAPI(Repository<UUID, Reservation> repo) {
         // In a real Spring app, use dependency injection (@Autowired)
-        this.service = new ExposureReservationService(new InMemoryReservationRepository());
+        this.service = new ExposureReservationService(repo);
     }
 
     /**
