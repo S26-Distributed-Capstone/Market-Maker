@@ -1,10 +1,11 @@
 services:
   app:
     environment:
-      - SPRING_PROFILES_ACTIVE=exchange
+      - SPRING_PROFILES_ACTIVE=trading-state
     image: market-maker
     ports:
       - "8080:8080"
+      - "7000:7000"
     depends_on:
       postgres:
         condition: service_healthy
