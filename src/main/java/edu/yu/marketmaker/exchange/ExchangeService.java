@@ -21,12 +21,10 @@ public class ExchangeService {
 
     private Repository<String, Quote> quoteRepository;
     private OrderDispatcher orderDispatcher;
-    private OrderValidator orderValidator;
 
-    public ExchangeService(Repository<String, Quote> quoteRepository, OrderDispatcher orderDispatcher, OrderValidator orderValidator) {
+    public ExchangeService(Repository<String, Quote> quoteRepository, OrderDispatcher orderDispatcher) {
         this.quoteRepository = quoteRepository;
         this.orderDispatcher = orderDispatcher;
-        this.orderValidator = orderValidator;
     }
     
     @GetMapping("/quotes/{symbol}")
@@ -47,7 +45,6 @@ public class ExchangeService {
 
     @PostMapping("/orders")
     void submitOrder(@RequestBody ExternalOrder order) {
-        orderValidator.validateOrder(order);
         orderDispatcher.dispatchOrder(order);
     }
 
