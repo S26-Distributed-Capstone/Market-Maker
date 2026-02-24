@@ -4,8 +4,6 @@ import com.hazelcast.config.*;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
-import edu.yu.marketmaker.exchange.*;
-import edu.yu.marketmaker.exposurereservation.ExposureReservationService; // Imported service
 import edu.yu.marketmaker.memory.HazelcastRepository;
 import edu.yu.marketmaker.memory.Repository;
 import edu.yu.marketmaker.model.*;
@@ -21,7 +19,6 @@ import java.util.UUID;
  * backed by PostgreSQL for data persistence.
  */
 @Configuration
-@Profile("exchange")
 public class HazelcastConfig {
 
     private static final String POSITIONS_MAP_NAME = "positions";
@@ -123,15 +120,6 @@ public class HazelcastConfig {
 
     // --- IMap Beans for Dependency Injection ---
 
-    @Bean
-    public OrderDispatcher orderDispatcher(OrderDispatcher orderDispatcher) {
-        return new TestOrderDispatcher();
-    }
-
-    @Bean
-    public OrderValidator orderValidator(OrderValidator orderValidator) {
-        return new BasicOrderValidator();
-    }
 
     /**
      * Provides the positions IMap for dependency injection.
