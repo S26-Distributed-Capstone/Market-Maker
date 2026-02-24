@@ -19,7 +19,6 @@ import java.util.UUID;
  * backed by PostgreSQL for data persistence.
  */
 @Configuration
-@Profile({"exchange", "trading-state"})
 public class HazelcastConfig {
 
     private static final String POSITIONS_MAP_NAME = "positions";
