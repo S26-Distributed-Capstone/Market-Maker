@@ -86,8 +86,8 @@ public class RSocketTestClient {
 
         // -------------------------------------------------------
         // 4. Stream live updates  (request-stream  →  state.stream)
-        //    Runs for 15 seconds so you can submit fills from
-        //    another terminal and watch them arrive here.
+        //    A background thread submits fills every 2 seconds
+        //    while the main thread listens to the stream for 15 s.
         // -------------------------------------------------------
         System.out.println(">>> Subscribing to state.stream (will listen for 15 s) ...");
         Disposable subscription = requester.route("state.stream")
@@ -96,26 +96,43 @@ public class RSocketTestClient {
                 .doOnError(e -> System.err.println("<<< Stream error: " + e.getMessage()))
                 .subscribe();
 
-        // Submit a second fill while the stream is open so we can see it arrive
-        Thread.sleep(2000);
-        Fill fill2 = new Fill(
-                UUID.randomUUID(),
-                "AAPL",
-                Side.SELL,
-                50,
-                151.00,
-                UUID.randomUUID(),
-                System.currentTimeMillis()
-        );
-        System.out.println("\n>>> Submitting second fill while stream is open: " + fill2);
-        requester.route("state.fills")
-                .data(fill2)
-                .retrieveMono(Void.class)
-                .doOnSuccess(v -> System.out.println("<<< Second fill submitted\n"))
-                .block(Duration.ofSeconds(5));
+        // Background thread that submits fills while the stream is open
+        Thread fillSubmitter = new Thread(() -> {
+            String[] symbols = {"AAPL", "GOOG", "MSFT", "AAPL", "GOOG"};
+            Side[] sides = {Side.SELL, Side.BUY, Side.BUY, Side.BUY, Side.SELL};
+            int[] quantities = {50, 200, 75, 30, 100};
+            double[] prices = {151.00, 2800.50, 330.10, 149.75, 2810.00};
 
-        // Let the stream run a bit longer
-        Thread.sleep(13_000);
+            for (int i = 0; i < symbols.length; i++) {
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                Fill f = new Fill(
+                        UUID.randomUUID(),
+                        symbols[i],
+                        sides[i],
+                        quantities[i],
+                        prices[i],
+                        UUID.randomUUID(),
+                        System.currentTimeMillis()
+                );
+                System.out.println("\n>>> [fill-thread] Submitting fill #" + (i + 1) + ": " + f);
+                requester.route("state.fills")
+                        .data(f)
+                        .retrieveMono(Void.class)
+                        .doOnSuccess(v -> System.out.println("<<< [fill-thread] Fill submitted"))
+                        .doOnError(e -> System.err.println("<<< [fill-thread] Error: " + e.getMessage()))
+                        .block(Duration.ofSeconds(5));
+            }
+            System.out.println("\n>>> [fill-thread] Done submitting fills");
+        }, "fill-submitter");
+
+        fillSubmitter.start();
+        fillSubmitter.join(); // wait for all fills to be submitted
+        Thread.sleep(3000);   // linger a bit to catch any final stream events
         subscription.dispose();
 
         System.out.println("\n=== Done ===");
