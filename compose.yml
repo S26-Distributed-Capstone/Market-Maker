@@ -1,5 +1,6 @@
 services:
   app:
+    build: .
     environment:
       - SPRING_PROFILES_ACTIVE=trading-state
     image: market-maker
