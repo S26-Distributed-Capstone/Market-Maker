@@ -4,8 +4,8 @@ import edu.yu.marketmaker.model.ExternalOrder;
 import edu.yu.marketmaker.model.Side;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.net.URI;
@@ -56,13 +56,14 @@ public class ExternalOrderPublisher {
         logger.info("Submitting {} order: {} x {} @ {}",
                 order.side(), order.symbol(), order.quantity(), order.limitPrice());
 
-        ObjectMapper mapper = JsonMapper
-                .builder()
-                .findAndAddModules()
-                .build();
-        String serializedOrder = mapper.writeValueAsString(order);
+        ObjectMapper mapper = JsonMapper.builder().findAndAddModules().build();
 
-        this.httpConnection.sendData(serializedOrder);
+        try {
+            String serializedOrder = mapper.writeValueAsString(order);
+            this.httpConnection.sendData(serializedOrder);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            logger.error("Failed to serialize order to JSON: {}", order, e);
+        }
     }
 
     /**
@@ -73,13 +74,6 @@ public class ExternalOrderPublisher {
         logger.info("Starting order generation for symbols: {}", symbols);
 
         this.httpConnection = new PersistentHttpConnection(URI.create(this.exchangeBaseUrl));
-
-        // TODO: Implement continuous order generation loop
-        // - For each symbol, generate random ExternalOrder
-        // - Random quantity between 1-20
-        // - Random price near reference price (e.g., 100 +/- 5)
-        // - Sleep between orders to control rate (e.g., 2 orders/second)
-        // - Use multiple threads for concurrency across symbols
 
         while (!this.isShutdown) {
             for (int i=0; i < this.random.nextInt(20); i++) { // Generate 10 orders per batch

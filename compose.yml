@@ -10,7 +10,23 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-  postgres:  # <--- THIS IS THE SERVICE NAME
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  external-order-publisher:
+    build: .
+    image: market-maker:latest
+    environment:
+      - SPRING_PROFILES_ACTIVE=external-publisher
+    depends_on:
+      exchange:
+        condition: service_healthy
+
+  postgres:
     image: postgres
     environment:
       - POSTGRES_USER=postgres
