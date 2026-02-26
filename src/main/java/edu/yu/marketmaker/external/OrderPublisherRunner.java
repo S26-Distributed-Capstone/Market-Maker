@@ -1,4 +1,4 @@
-package edu.yu.marketmaker;
+package edu.yu.marketmaker.external;
 
 import edu.yu.marketmaker.external.ExternalOrderPublisher;
 import org.springframework.beans.factory.annotation.Value;

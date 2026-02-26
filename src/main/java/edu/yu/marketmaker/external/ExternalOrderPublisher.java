@@ -75,13 +75,6 @@ public class ExternalOrderPublisher {
 
         this.httpConnection = new PersistentHttpConnection(URI.create(this.exchangeBaseUrl));
 
-        // TODO: Implement continuous order generation loop
-        // - For each symbol, generate random ExternalOrder
-        // - Random quantity between 1-20
-        // - Random price near reference price (e.g., 100 +/- 5)
-        // - Sleep between orders to control rate (e.g., 2 orders/second)
-        // - Use multiple threads for concurrency across symbols
-
         while (!this.isShutdown) {
             for (int i=0; i < this.random.nextInt(20); i++) { // Generate 10 orders per batch
                 for (String symbol : symbols) {
