@@ -3,7 +3,7 @@ package edu.yu.marketmaker.state;
 import edu.yu.marketmaker.model.Fill;
 import edu.yu.marketmaker.model.Position;
 import edu.yu.marketmaker.model.Side;
-import edu.yu.marketmaker.state.TradingStateService.StateSnapshot;
+import edu.yu.marketmaker.model.StateSnapshot;
 import io.rsocket.transport.netty.client.TcpClientTransport;
 import org.springframework.http.codec.json.JacksonJsonDecoder;
 import org.springframework.http.codec.json.JacksonJsonEncoder;

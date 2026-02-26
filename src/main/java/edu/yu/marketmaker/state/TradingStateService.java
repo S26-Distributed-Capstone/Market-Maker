@@ -6,6 +6,7 @@ import edu.yu.marketmaker.model.Fill;
 import edu.yu.marketmaker.model.Position;
 
 import edu.yu.marketmaker.model.Side;
+import edu.yu.marketmaker.model.StateSnapshot;
 import edu.yu.marketmaker.service.ServiceHealth;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
@@ -106,10 +107,7 @@ public class TradingStateService {
         }
         positionRepository.put(updatedPosition);
 
-        Collection<Fill> symbolFills = fillRepository.getAll().stream()
-                .filter(f -> f.symbol().equals(updatedPosition.symbol()))
-                .toList();
-        positionSink.tryEmitNext(new StateSnapshot(updatedPosition, symbolFills));
+        positionSink.tryEmitNext(new StateSnapshot(updatedPosition, fill));
     }
 
     /**
@@ -177,23 +175,15 @@ public class TradingStateService {
         // Emit current state first, then keep streaming live updates
         Flux<StateSnapshot> currentState = Flux.fromIterable(positionRepository.getAll())
                 .map(position -> {
-                    Collection<Fill> fills = fillRepository.getAll().stream()
-                            .filter(f -> f.symbol().equals(position.symbol()))
-                            .toList();
-                    return new StateSnapshot(position, fills);
+                    Fill lastFill = position.lastFillId() != null
+                            ? fillRepository.get(position.lastFillId()).orElse(null)
+                            : null;
+                    return new StateSnapshot(position, lastFill);
                 });
 
         return currentState.concatWith(positionSink.asFlux());
     }
 
-    /**
-     * A snapshot of a single position together with all fills that contributed
-     * to it.  Sent as individual stream items to RSocket subscribers.
-     *
-     * @param position the current net position for a symbol
-     * @param fills    all fills recorded for that symbol
-     */
-    public record StateSnapshot(Position position, Collection<Fill> fills) {}
 
     @GetMapping("/health")
     ServiceHealth getHealth() {
