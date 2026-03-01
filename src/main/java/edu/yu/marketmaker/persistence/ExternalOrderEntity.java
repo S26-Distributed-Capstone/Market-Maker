@@ -30,7 +30,12 @@ public class ExternalOrderEntity implements IdentifiableEntity<UUID> {
     }
 
     /**
-     * All-args constructor.
+     * Constructor for ExternalOrderEntity.
+     * @param id unique identifier
+     * @param symbol ticker
+     * @param quantity number of shares
+     * @param limitPrice limit price
+     * @param side buy or sell
      */
     public ExternalOrderEntity(UUID id, String symbol, int quantity, double limitPrice, Side side) {
         this.id = id;
@@ -42,6 +47,10 @@ public class ExternalOrderEntity implements IdentifiableEntity<UUID> {
 
     // --- IdentifiableEntity Implementation ---
 
+    /**
+     * Returns the unique identifier for this entity.
+     * @return
+     */
     @Override
     public UUID getId() {
         return id;

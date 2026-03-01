@@ -12,6 +12,9 @@ import org.springframework.stereotype.Component;
 
 import edu.yu.marketmaker.model.Position;
 
+/**
+ * Static position repository for testing.
+ */
 @Component
 @Profile("testing")
 public class StaticPositionRepository implements Repository<String, Position> {

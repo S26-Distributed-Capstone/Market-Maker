@@ -27,6 +27,15 @@ public class HazelcastConfig {
     private static final String EXTERNAL_ORDERS_MAP_NAME = "external-orders";
     private static final String RESERVATIONS_MAP_NAME = "reservations";
 
+    /**
+     * Create Hazelcast Instance with all necessary tables.
+     * @param positionRepository
+     * @param fillRepository
+     * @param quoteRepository
+     * @param externalOrderRepository
+     * @param reservationRepository
+     * @return
+     */
     @Bean
     public HazelcastInstance hazelcastInstance(
             JpaPositionRepository positionRepository,
@@ -51,36 +60,66 @@ public class HazelcastConfig {
         return Hazelcast.newHazelcastInstance(config);
     }
 
+    /**
+     * Method creates the Position Map
+     * @param repository
+     * @return
+     */
     private MapConfig createPositionsMapConfig(JpaPositionRepository repository) {
         MapConfig mapConfig = new MapConfig(POSITIONS_MAP_NAME);
         configureMapStore(mapConfig, new PositionMapStore(repository));
         return mapConfig;
     }
 
+    /**
+     * Method creates the Fill Map
+     * @param repository
+     * @return
+     */
     private MapConfig createFillsMapConfig(JpaFillRepository repository) {
         MapConfig mapConfig = new MapConfig(FILLS_MAP_NAME);
         configureMapStore(mapConfig, new FillMapStore(repository));
         return mapConfig;
     }
 
+    /**
+     * Method creates the Quote Map
+     * @param repository
+     * @return
+     */
     private MapConfig createQuotesMapConfig(JpaQuoteRepository repository) {
         MapConfig mapConfig = new MapConfig(QUOTES_MAP_NAME);
         configureMapStore(mapConfig, new QuoteMapStore(repository));
         return mapConfig;
     }
 
+    /**
+     * Method creates the External Order Map
+     * @param repository
+     * @return
+     */
     private MapConfig createExternalOrdersMapConfig(JpaExternalOrderRepository repository) {
         MapConfig mapConfig = new MapConfig(EXTERNAL_ORDERS_MAP_NAME);
         configureMapStore(mapConfig, new ExternalOrderMapStore(repository));
         return mapConfig;
     }
 
+    /**
+     * Method creates the Reservation Map
+     * @param repository
+     * @return
+     */
     private MapConfig createReservationsMapConfig(JpaReservationRepository repository) {
         MapConfig mapConfig = new MapConfig(RESERVATIONS_MAP_NAME);
         configureMapStore(mapConfig, new ReservationMapStore(repository));
         return mapConfig;
     }
 
+    /**
+     * Method to set parameters for DB interaction.
+     * @param mapConfig config object to be used for parameters
+     * @param mapStoreImpl implementation of MapStore
+     */
     private void configureMapStore(MapConfig mapConfig, Object mapStoreImpl) {
         MapStoreConfig mapStoreConfig = new MapStoreConfig();
         mapStoreConfig.setImplementation(mapStoreImpl);
@@ -108,6 +147,10 @@ public class HazelcastConfig {
         mapConfig.setAsyncBackupCount(0);
     }
 
+    /**
+     * Network configuration for Hazelcast Nodes
+     * @param config config object to be used for parameters of Hazelcast
+     */
     private void configureNetwork(Config config) {
         NetworkConfig networkConfig = config.getNetworkConfig();
 
