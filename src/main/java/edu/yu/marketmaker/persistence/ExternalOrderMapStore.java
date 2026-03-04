@@ -17,6 +17,10 @@ public class ExternalOrderMapStore implements MapStore<UUID, ExternalOrder> {
 
     private final BaseJpaRepository<ExternalOrderEntity, UUID> repository;
 
+    /**
+     * Constructor for ExternalOrderMapStore.
+     * @param repository repo to store entities
+     */
     public ExternalOrderMapStore(BaseJpaRepository<ExternalOrderEntity, UUID> repository) {
         this.repository = repository;
     }

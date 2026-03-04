@@ -18,25 +18,46 @@ public class HazelcastRepository<K, T extends Identifiable<K>> implements Reposi
 
     private final IMap<K, T> map;
 
+    /**
+     * Constructor for HazelcastRepository.
+     * @param map that this class will wrap
+     */
     public HazelcastRepository(IMap<K, T> map) {
         this.map = map;
     }
 
+    /**
+     * Get mapped value
+     * @param id key of the entity
+     * @return
+     */
     @Override
     public Optional<T> get(K id) {
         return Optional.ofNullable(map.get(id));
     }
 
+    /**
+     * Store entity
+     * @param entity to be stored
+     */
     @Override
     public void put(T entity) {
         map.put(entity.getId(), entity);
     }
 
+    /**
+     * Get all mapped values
+     * @return Collection of all entities
+     */
     @Override
     public Collection<T> getAll() {
         return map.values();
     }
 
+    /**
+     * Delete entity
+     * @param id key of the entity
+     */
     @Override
     public void delete(K id) {
         map.remove(id);

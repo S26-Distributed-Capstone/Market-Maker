@@ -26,7 +26,9 @@ import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 
-
+/**
+ * Trading state service controls system-wide positions.
+ */
 @RestController
 @Profile("trading-state")
 public class TradingStateService {
@@ -44,6 +46,11 @@ public class TradingStateService {
     private final Sinks.Many<StateSnapshot> positionSink =
             Sinks.many().multicast().onBackpressureBuffer();
 
+    /**
+     * Constructor.
+     * @param positionRepository
+     * @param fillRepository
+     */
     public TradingStateService(Repository<String, Position> positionRepository, Repository<UUID, Fill> fillRepository) {
         this.positionRepository = positionRepository;
         this.fillRepository = fillRepository;
@@ -184,7 +191,10 @@ public class TradingStateService {
         return currentState.concatWith(positionSink.asFlux());
     }
 
-
+    /**
+     * Get health of the trading state service.
+     * @return
+     */
     @GetMapping("/health")
     ServiceHealth getHealth() {
         return new ServiceHealth(true, 0, "Trading State Service");
