@@ -15,6 +15,9 @@ import edu.yu.marketmaker.model.ExternalOrder;
 import edu.yu.marketmaker.model.Quote;
 import edu.yu.marketmaker.service.ServiceHealth;
 
+/**
+ * Exchange service manages quotes and external orders
+ */
 @RestController
 @Profile("exchange")
 public class ExchangeService {
@@ -27,6 +30,11 @@ public class ExchangeService {
         this.orderDispatcher = orderDispatcher;
     }
     
+    /**
+     * HTTP: get a quote from symbol
+     * @param symbol the symbol to get a quote for
+     * @return the corresponding quote
+     */
     @GetMapping("/quotes/{symbol}")
     Quote getQuote(@PathVariable String symbol) {
         Optional<Quote> quote = quoteRepository.get(symbol);
@@ -38,16 +46,29 @@ public class ExchangeService {
         
     }
 
+    /**
+     * HTTP: update the value of a quote
+     * @param symbol the symbol to uodate a quote for
+     * @param quote the new value of the quote
+     */
     @PutMapping("/quotes/{symbol}")
     void putQuote(@PathVariable String symbol, @RequestBody Quote quote) {
         quoteRepository.put(quote);
     }
 
+    /**
+     * HTTP: submit an external order
+     * @param order the external order to submit
+     */
     @PostMapping("/orders")
     void submitOrder(@RequestBody ExternalOrder order) {
         orderDispatcher.dispatchOrder(order);
     }
 
+    /**
+     * HTTP: retrieve the health and info of the service
+     * @return the current health info
+     */
     @GetMapping("/health")
     ServiceHealth getHealth() {
         return new ServiceHealth(true, 0, "Exchange Service");

@@ -1,5 +1,7 @@
 package edu.yu.marketmaker.exchange;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import edu.yu.marketmaker.memory.Repository;
@@ -11,6 +13,8 @@ import edu.yu.marketmaker.model.Side;
 @Component
 public class FillOrderDispatcher implements OrderDispatcher {
 
+    private static final Logger logger = LoggerFactory.getLogger(FillOrderDispatcher.class);
+
     private final Repository<String, Quote> quoteRepository;
     private final FillSender fillSender;
 
@@ -21,6 +25,8 @@ public class FillOrderDispatcher implements OrderDispatcher {
 
     @Override
     public void dispatchOrder(ExternalOrder order) {
+        logger.info("Dispatching {} order: {} x {} @ {}",
+            order.side(), order.symbol(), order.quantity(), order.limitPrice());
         Quote quote = quoteRepository.get(order.symbol()).orElseThrow(() -> new OrderValidationException("Quote " + order.symbol() + " does not exist"));
         long timestamp = System.currentTimeMillis();
         if (timestamp >= quote.expiresAt()) {
