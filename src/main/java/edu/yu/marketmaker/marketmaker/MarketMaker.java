@@ -1,5 +1,8 @@
 package edu.yu.marketmaker.marketmaker;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
@@ -15,10 +18,12 @@ public class MarketMaker implements ApplicationRunner {
 
     private final PositionTracker positionTracker;
     private final QuoteGenerator quoteGenerator;
+    private final Set<String> handledSymbols;
 
     public MarketMaker(PositionTracker positionTracker, QuoteGenerator quoteGenerator) {
         this.positionTracker = positionTracker;
         this.quoteGenerator = quoteGenerator;
+        this.handledSymbols = new HashSet<>();
     }
 
     private void handlePosition(StateSnapshot snapshot) {
@@ -31,11 +36,19 @@ public class MarketMaker implements ApplicationRunner {
     }
 
     private boolean handlesSymbol(String symbol) {
-        return false;
+        return handledSymbols.contains(symbol);
     }
 
     private boolean newVersion(Position position) {
         return false;
+    }
+
+    public boolean addSymbol(String symbol) {
+        return handledSymbols.add(symbol);
+    }
+
+    public boolean removeSymbol(String symbol) {
+        return handledSymbols.remove(symbol);
     }
 
     @Override
