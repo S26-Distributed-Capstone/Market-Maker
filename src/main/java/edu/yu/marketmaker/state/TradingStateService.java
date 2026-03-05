@@ -5,6 +5,9 @@ import edu.yu.marketmaker.memory.Repository;
 import edu.yu.marketmaker.model.Fill;
 import edu.yu.marketmaker.model.Position;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import edu.yu.marketmaker.model.Side;
 import edu.yu.marketmaker.model.StateSnapshot;
 import edu.yu.marketmaker.service.ServiceHealth;
@@ -32,6 +35,8 @@ import java.util.UUID;
 @RestController
 @Profile("trading-state")
 public class TradingStateService {
+
+    private static final Logger logger = LoggerFactory.getLogger(TradingStateService.class);
 
     private final Repository<String, Position> positionRepository;
     private final Repository<UUID, Fill> fillRepository;
@@ -99,8 +104,10 @@ public class TradingStateService {
      * @throws HazelcastException       if the underlying repository fails
      */
     private void processFill(Fill fill) {
+        logger.info("Processing fill: id={}, symbol={}, side={}, quantity={}", fill.getId(), fill.symbol(), fill.side(), fill.quantity());
         Optional<Position> position = positionRepository.get(fill.symbol());
         if (position.isEmpty() && fill.side() == Side.SELL) {
+            logger.warn("Rejected fill: cannot SELL with no existing position for symbol={}", fill.symbol());
             throw new IllegalArgumentException("Cannot sell with no existing position for: " + fill.symbol());
         }
         fillRepository.put(fill);
@@ -109,11 +116,13 @@ public class TradingStateService {
         if (position.isPresent()) {
             int newQuantity = position.get().netQuantity() + quantity;
             updatedPosition = new Position(fill.symbol(), newQuantity, position.get().version() + 1, fill.getId());
+            logger.info("Updated existing position: symbol={}, newNetQuantity={}, version={}", updatedPosition.symbol(), updatedPosition.netQuantity(), updatedPosition.version());
         } else {
             updatedPosition = new Position(fill.symbol(), quantity, 0, fill.getId());
+            logger.info("Created new position: symbol={}, netQuantity={}", updatedPosition.symbol(), updatedPosition.netQuantity());
         }
         positionRepository.put(updatedPosition);
-
+        logger.info("Persisted position for symbol={}, emitting StateSnapshot to sink", fill.symbol());
         positionSink.tryEmitNext(new StateSnapshot(updatedPosition, fill));
     }
 
