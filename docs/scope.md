@@ -2,7 +2,7 @@
 
 ## Submitting External Orders
 
-External orders could be submitted into the submitted to the exchange.
+External orders could be submitted to the exchange.
 Workflow diagram:
 
 ### Error Cases
