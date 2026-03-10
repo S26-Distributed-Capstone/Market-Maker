@@ -4,7 +4,7 @@
 
 
 ## Overview
-> Distributed Market Maker that utilizes exchange data to publish quotes in real time.
+> Distributed Market Maker that utilizes exchange data to publish quotes in real time and execute trades against them.
 
 ## Project Plan
 
