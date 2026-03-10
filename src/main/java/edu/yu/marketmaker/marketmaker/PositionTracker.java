@@ -12,7 +12,7 @@ public class PositionTracker {
     private final RSocketRequester requester;
 
     public PositionTracker(RSocketRequester.Builder rsocketRequesterBuilder) {
-        this.requester = rsocketRequesterBuilder.tcp(null, 0); // TODO: determine host
+        this.requester = rsocketRequesterBuilder.tcp("trading-state", 7000);
     }
 
     public Flux<StateSnapshot> getPositions() {
