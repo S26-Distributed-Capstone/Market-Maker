@@ -4,7 +4,7 @@
 
 
 ## Overview
-> *Provide a short introduction, summary and functional overview of what your project group is trying to achieve and implement.*
+> Distributed Market Maker that utilizes exchange data to publish quotes in real time.
 
 ## Project Plan
 
