@@ -7,6 +7,7 @@ import com.hazelcast.map.IMap;
 import edu.yu.marketmaker.memory.HazelcastRepository;
 import edu.yu.marketmaker.memory.Repository;
 import edu.yu.marketmaker.model.*;
+import edu.yu.marketmaker.exposurereservation.ExposureReservationService;
 import edu.yu.marketmaker.persistence.*;
 import edu.yu.marketmaker.persistence.interfaces.*;
 import org.springframework.context.annotation.*;
@@ -236,5 +237,21 @@ public class HazelcastConfig {
     @Bean
     public Repository<UUID, ExternalOrder> externalOrderRepository(IMap<UUID, ExternalOrder> externalOrdersMap) {
         return new HazelcastRepository<>(externalOrdersMap);
+    }
+
+    /**
+     * Provides the Reservation repository for dependency injection.
+     */
+    @Bean
+    public Repository<UUID, Reservation> reservationRepository(IMap<UUID, Reservation> reservationsMap) {
+        return new HazelcastRepository<>(reservationsMap);
+    }
+
+    /**
+     * Provides the ExposureReservationService for dependency injection.
+     */
+    @Bean
+    public ExposureReservationService exposureReservationService(Repository<UUID, Reservation> reservationRepository) {
+        return new ExposureReservationService(reservationRepository);
     }
 }

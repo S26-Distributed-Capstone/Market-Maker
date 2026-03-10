@@ -3,6 +3,7 @@ package edu.yu.marketmaker.exposurereservation;
 import edu.yu.marketmaker.memory.Repository;
 import edu.yu.marketmaker.model.*;
 
+import edu.yu.marketmaker.service.ServiceHealth;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -75,5 +76,16 @@ public class ExposureReservationAPI {
     @GetMapping("/exposure")
     public ResponseEntity<ExposureState> getExposure() {
         return ResponseEntity.ok(service.getExposureState());
+    }
+
+    /**
+     * GET /health
+     * Health check endpoint to verify the service is running and responsive.
+     *
+     * @return A ServiceHealth object indicating the health status of the service.
+     */
+    @GetMapping("/health")
+    public ResponseEntity<ServiceHealth> getHealth() {
+        return ResponseEntity.ok(new ServiceHealth(true, 0, "Exposure Reservation Service"));
     }
 }
