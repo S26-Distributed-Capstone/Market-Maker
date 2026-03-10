@@ -1,18 +1,18 @@
 # Technologies
 
-## Hazelcast
+## [Hazelcast](https://hazelcast.com)
 Used as the storage layer. It provides an easy way to connect the in-memory cache to the database and supports distributed systems.
 
-## PostgreSQL
+## [PostgreSQL](https://www.postgresql.org)
 Used for data storage.
 
-## Spring Boot
+## [Spring Boot](https://spring.io/projects/spring-boot)
 Used for communication HTTP/TCP setup due to its ease of use.
 
-### RSocket (TCP)
-Used for inter-service communication over TCP. RSocket integrates easily with Spring Boot.
+### [RSocket (TCP)](https://rsocket.io)
+Used for inter-service communication over TCP. RSocket integrates easily with Spring Boot and provides easy TCP streaming and subscriber services.
 
-## Docker
+## [Docker](https://www.docker.com)
 Used to containerize the software for deployment via Kubernetes.
 
 ## Java
