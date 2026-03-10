@@ -6,7 +6,7 @@
 **Challenge:** Ensuring diverse services can discover and interact with each other reliably.
 * **Implementation:**
     * **REST/HTTP:** Used for synchronous external orders and quote management via Spring Boot.
-    * **RabbitMQ:** Facilitates asynchronous, decoupled inter-service communication (e.g., Exchange notifying Trading State of fills).
+    * **TCP:** Facilitates asynchronous, decoupled inter-service communication (e.g., Exchange notifying Trading State of fills).
     * **WebSockets:** Used by the UI and Market Maker nodes for real-time position updates.
 
 
