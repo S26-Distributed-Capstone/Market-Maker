@@ -43,9 +43,9 @@ All endpoints are REST (JSON over HTTP). Each service is activated by a Spring p
 | **GET** | `/positions/{symbol}` | Retrieve a specific position by ticker symbol. Returns the `Position` if present, or empty. |
 | **GET** | `/health` | Health-check endpoint. Returns a `ServiceHealth` object. |
 
-### RSocket Endpoints (TCP, port 7000)
+### RSocket Endpoints (TCP)
 
-These use Spring RSocket `@MessageMapping` — **not** HTTP — but are listed here for completeness.
+These use Spring RSocket `@MessageMapping` — **not** HTTP.
 
 | Route | Pattern | Description |
 |-------|---------|-------------|
