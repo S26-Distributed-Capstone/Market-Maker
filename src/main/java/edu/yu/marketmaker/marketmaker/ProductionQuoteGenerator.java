@@ -70,7 +70,7 @@ public class ProductionQuoteGenerator implements QuoteGenerator {
                 askPrice,
                 askQuantity,
                 UUID.randomUUID(),
-                System.currentTimeMillis() + 60_000
+                System.currentTimeMillis() + 30_000
         );
 
         ReservationResponse reservation = reservationRequester
