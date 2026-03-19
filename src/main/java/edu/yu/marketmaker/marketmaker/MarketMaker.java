@@ -31,8 +31,6 @@ public class MarketMaker implements ApplicationRunner {
             return;
         }
         Quote quote = quoteGenerator.generateQuote(snapshot.position(), snapshot.fill());
-        // TODO: update reservations
-        // TODO: send new quote to exchange
     }
 
     private boolean handlesSymbol(String symbol) {

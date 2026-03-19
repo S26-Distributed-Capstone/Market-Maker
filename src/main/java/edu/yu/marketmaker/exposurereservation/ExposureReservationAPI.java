@@ -1,6 +1,5 @@
 package edu.yu.marketmaker.exposurereservation;
 
-import edu.yu.marketmaker.memory.Repository;
 import edu.yu.marketmaker.model.*;
 
 import edu.yu.marketmaker.service.ServiceHealth;
@@ -10,8 +9,6 @@ import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.UUID;
 
 /**
  * REST Controller for the Exposure Reservation API.
@@ -23,8 +20,8 @@ public class ExposureReservationAPI {
 
     private final ExposureReservationService service;
 
-    public ExposureReservationAPI(Repository<UUID, Reservation> repo) {
-        this.service = new ExposureReservationService(repo);
+    public ExposureReservationAPI(ExposureReservationService service) {
+        this.service = service;
     }
 
     /**
@@ -49,51 +46,51 @@ public class ExposureReservationAPI {
     }
 
     /**
-     * POST /reservations/{id}/apply-fill
+     * POST /reservations/{symbol}/apply-fill
      * Updates an existing reservation after a partial or full fill occurs.
      * Reduces the reserved exposure on the appropriate side by the filled amount.
      *
-     * @param id   The UUID of the reservation.
+     * @param symbol The symbol key of the reservation.
      * @param fill The fill containing quantity and side (BUY or SELL).
      * @return A response indicating the capacity that was freed up by this fill.
      */
-    @PostMapping("/reservations/{id}/apply-fill")
-    public ResponseEntity<FreedCapacityResponse> applyFill(@PathVariable UUID id, @RequestBody Fill fill) {
-        int freed = service.applyFill(id, fill.quantity(), fill.side());
+    @PostMapping("/reservations/{symbol}/apply-fill")
+    public ResponseEntity<FreedCapacityResponse> applyFill(@PathVariable String symbol, @RequestBody Fill fill) {
+        int freed = service.applyFill(symbol, fill.quantity(), fill.side());
         return ResponseEntity.ok(new FreedCapacityResponse(freed));
     }
 
     /**
-     * TCP/RSocket: request-response route {@code "reservations.{id}.apply-fill"}.
-     * Applies a fill with the same behavior as POST /reservations/{id}/apply-fill.
+     * TCP/RSocket: request-response route {@code "reservations.{symbol}.apply-fill"}.
+     * Applies a fill with the same behavior as POST /reservations/{symbol}/apply-fill.
      */
-    @MessageMapping("reservations.{id}.apply-fill")
-    public FreedCapacityResponse applyFillMessage(@DestinationVariable UUID id, @Payload Fill fill) {
-        int freed = service.applyFill(id, fill.quantity(), fill.side());
+    @MessageMapping("reservations.{symbol}.apply-fill")
+    public FreedCapacityResponse applyFillMessage(@DestinationVariable String symbol, @Payload Fill fill) {
+        int freed = service.applyFill(symbol, fill.quantity(), fill.side());
         return new FreedCapacityResponse(freed);
     }
 
     /**
-     * POST /reservations/{id}/release
+     * POST /reservations/{symbol}/release
      * Manually releases a reservation on both sides, typically used when a quote
      * is replaced, canceled, or expires.
      *
-     * @param id The UUID of the reservation to release.
+     * @param symbol The symbol key of the reservation to release.
      * @return A response indicating the total capacity that was freed.
      */
-    @PostMapping("/reservations/{id}/release")
-    public ResponseEntity<FreedCapacityResponse> release(@PathVariable UUID id) {
-        int freed = service.release(id);
+    @PostMapping("/reservations/{symbol}/release")
+    public ResponseEntity<FreedCapacityResponse> release(@PathVariable String symbol) {
+        int freed = service.release(symbol);
         return ResponseEntity.ok(new FreedCapacityResponse(freed));
     }
 
     /**
-     * TCP/RSocket: request-response route {@code "reservations.{id}.release"}.
-     * Releases a reservation with the same behavior as POST /reservations/{id}/release.
+     * TCP/RSocket: request-response route {@code "reservations.{symbol}.release"}.
+     * Releases a reservation with the same behavior as POST /reservations/{symbol}/release.
      */
-    @MessageMapping("reservations.{id}.release")
-    public FreedCapacityResponse releaseMessage(@DestinationVariable UUID id) {
-        int freed = service.release(id);
+    @MessageMapping("reservations.{symbol}.release")
+    public FreedCapacityResponse releaseMessage(@DestinationVariable String symbol) {
+        int freed = service.release(symbol);
         return new FreedCapacityResponse(freed);
     }
 

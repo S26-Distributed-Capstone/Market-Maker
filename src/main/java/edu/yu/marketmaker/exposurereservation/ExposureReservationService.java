@@ -15,11 +15,11 @@ import java.util.*;
  */
 public class ExposureReservationService {
     private final Logger logger;
-    private final Repository<UUID, Reservation> reservations;
+    private final Repository<String, Reservation> reservations;
 
     private static final int MAX_RESERVATION_LIMIT = 100;
 
-    public ExposureReservationService(Repository<UUID, Reservation> repo) {
+    public ExposureReservationService(Repository<String, Reservation> repo) {
         this.reservations = repo;
         this.logger = LoggerFactory.getLogger(ExposureReservationService.class);
     }
@@ -34,6 +34,8 @@ public class ExposureReservationService {
     public synchronized ReservationResponse createReservation(Quote quote) {
         logger.info("Creating reservation for Symbol: {}, BidQty: {}, AskQty: {}",
                 quote.symbol(), quote.bidQuantity(), quote.askQuantity());
+
+        release(quote.symbol());
 
         // Calculate current bid and ask usage separately
         int currentBidUsage = reservations.getAll().stream()
@@ -61,7 +63,7 @@ public class ExposureReservationService {
         // Determine overall status based on both sides
         ReservationStatus status = determineStatus(requestedBid, grantedBid, requestedAsk, grantedAsk);
 
-        Reservation r = new Reservation(UUID.randomUUID(), quote.symbol(),
+        Reservation r = new Reservation(quote.symbol(), quote.symbol(),
                 requestedBid, grantedBid, requestedAsk, grantedAsk, status);
 
         reservations.put(r);
@@ -76,25 +78,25 @@ public class ExposureReservationService {
      * When a trade executes, the reserved exposure is converted to actual position,
      * so we free up the reserved capacity corresponding to the fill.
      *
-     * @param id        The UUID of the reservation.
+     * @param symbol    The symbol key of the reservation.
      * @param filledQty The quantity that was filled.
      * @param side      The side of the fill (BUY reduces bid exposure, SELL reduces ask exposure).
      * @return The amount of capacity freed by this operation.
      * @throws RuntimeException if the reservation is not found.
      */
-    public synchronized int applyFill(UUID id, int filledQty, Side side) {
-        logger.info("Applying fill: ID={}, FilledQty={}, Side={}", id, filledQty, side);
+    public synchronized int applyFill(String symbol, int filledQty, Side side) {
+        logger.info("Applying fill: symbol={}, FilledQty={}, Side={}", symbol, filledQty, side);
 
-        Optional<Reservation> r = reservations.get(id);
+        Optional<Reservation> r = reservations.get(symbol);
         if (r.isEmpty()) {
-            logger.error("Failed to apply fill: Reservation ID {} not found", id);
+            logger.error("Failed to apply fill: reservation for symbol {} not found", symbol);
             throw new RuntimeException("Reservation not found");
         }
 
         Reservation reservation = r.get();
         int freed = reduceGrantOnFill(reservation, filledQty, side);
 
-        logger.info("Fill applied successfully: ID={}, Side={}, FreedCapacity={}", id, side, freed);
+        logger.info("Fill applied successfully: symbol={}, Side={}, FreedCapacity={}", symbol, side, freed);
         return freed;
     }
 
@@ -102,23 +104,23 @@ public class ExposureReservationService {
      * Releases all remaining capacity for a specific reservation on both sides.
      * This is typically called when a quote is cancelled or expires.
      *
-     * @param id The UUID of the reservation.
+     * @param symbol The symbol key of the reservation.
      * @return The total capacity freed (bid + ask).
      * @throws RuntimeException if the reservation is not found.
      */
-    public synchronized int release(UUID id) {
-        logger.info("Releasing reservation: ID={}", id);
+    public synchronized int release(String symbol) {
+        logger.info("Releasing reservation: symbol={}", symbol);
 
-        Optional<Reservation> r = reservations.get(id);
+        Optional<Reservation> r = reservations.get(symbol);
         if (r.isEmpty()) {
-            logger.error("Failed to release: Reservation ID {} not found", id);
+            logger.error("Failed to release: reservation for symbol {} not found", symbol);
             throw new RuntimeException("Reservation not found");
         }
 
         Reservation reservation = r.get();
         int freed = releaseRemaining(reservation);
 
-        logger.info("Reservation released: ID={}, FreedCapacity={}", id, freed);
+        logger.info("Reservation released: symbol={}, FreedCapacity={}", symbol, freed);
         return freed;
     }
 

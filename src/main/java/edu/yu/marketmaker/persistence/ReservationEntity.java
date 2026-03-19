@@ -4,17 +4,15 @@ import edu.yu.marketmaker.model.Reservation;
 import edu.yu.marketmaker.model.ReservationStatus;
 import jakarta.persistence.*;
 
-import java.util.UUID;
-
 /**
  * JPA Entity for Reservation records used by Hazelcast MapStore.
  */
 @Entity
 @Table(name = "reservations")
-public class ReservationEntity implements IdentifiableEntity<UUID> {
+public class ReservationEntity implements IdentifiableEntity<String> {
 
     @Id
-    private UUID id;
+    private String id;
     private String symbol;
     private int requestedBid;
     private int grantedBid;
@@ -34,7 +32,7 @@ public class ReservationEntity implements IdentifiableEntity<UUID> {
     /**
      * All-args constructor.
      */
-    public ReservationEntity(UUID id, String symbol, int requestedBid, int grantedBid,
+    public ReservationEntity(String id, String symbol, int requestedBid, int grantedBid,
                              int requestedAsk, int grantedAsk, ReservationStatus status) {
         this.id = id;
         this.symbol = symbol;
@@ -48,7 +46,7 @@ public class ReservationEntity implements IdentifiableEntity<UUID> {
     // --- IdentifiableEntity Implementation ---
 
     @Override
-    public UUID getId() {
+    public String getId() {
         return id;
     }
 
@@ -84,7 +82,7 @@ public class ReservationEntity implements IdentifiableEntity<UUID> {
 
     // --- Getters and Setters ---
 
-    public void setId(UUID id) {
+    public void setId(String id) {
         this.id = id;
     }
 
