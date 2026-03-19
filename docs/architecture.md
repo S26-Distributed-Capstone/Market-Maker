@@ -14,6 +14,6 @@ graph TD
     TradingState -->|"Sends position data"| MarketMaker
     TradingState -->|"Sends current position data"| PositionUI
     TradingState -->|"Updates exposures"| ExposureReservation
-    ExposureReservation -->|"Warn if over exposed"| Exchange
-    MarketMaker -->|"Updates quotes"| ExposureReservation
+    ExposureReservation -->|"Warn if over exposed"| MarketMaker
+    MarketMaker -->|"Sends updated quotes to Exchange"| Exchange
 ```
