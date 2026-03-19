@@ -13,8 +13,7 @@ graph TD
     Exchange -->|"Sends fill data"| TradingState
     TradingState -->|"Sends position data"| MarketMaker
     TradingState -->|"Sends current position data"| PositionUI
-    TradingState -->|"Updates exposures"| ExposureReservation
-    ExposureReservation -->|"Warn if over exposed"| Exchange
-    MarketMaker -->|"Updates quotes"| Exchange
+    ExposureReservation -->|"Responds to Market Makers requests with updated exposure data"| MarketMaker
+    MarketMaker -->|"Requests exposure from Exposure Service"| ExposureReservation
+    MarketMaker -->|"Sends updated quotes to Exchange"| Exchange
 ```
-
