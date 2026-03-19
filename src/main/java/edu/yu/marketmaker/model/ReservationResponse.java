@@ -6,7 +6,8 @@ import java.util.UUID;
 public record ReservationResponse(
         UUID id,
         ReservationStatus status,
-        int grantedQuantity
+        int grantedBidQuantity,
+        int grantedAskQuantity
 )
 {
 

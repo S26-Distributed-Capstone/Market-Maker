@@ -16,8 +16,10 @@ public class ReservationEntity implements IdentifiableEntity<UUID> {
     @Id
     private UUID id;
     private String symbol;
-    private int requested;
-    private int granted;
+    private int requestedBid;
+    private int grantedBid;
+    private int requestedAsk;
+    private int grantedAsk;
     @Enumerated(EnumType.STRING)
     private ReservationStatus status;
 
@@ -32,11 +34,14 @@ public class ReservationEntity implements IdentifiableEntity<UUID> {
     /**
      * All-args constructor.
      */
-    public ReservationEntity(UUID id, String symbol, int requested, int granted, ReservationStatus status) {
+    public ReservationEntity(UUID id, String symbol, int requestedBid, int grantedBid,
+                             int requestedAsk, int grantedAsk, ReservationStatus status) {
         this.id = id;
         this.symbol = symbol;
-        this.requested = requested;
-        this.granted = granted;
+        this.requestedBid = requestedBid;
+        this.grantedBid = grantedBid;
+        this.requestedAsk = requestedAsk;
+        this.grantedAsk = grantedAsk;
         this.status = status;
     }
 
@@ -54,7 +59,10 @@ public class ReservationEntity implements IdentifiableEntity<UUID> {
      * @return A Reservation record.
      */
     public Reservation toRecord() {
-        return new Reservation(this.id, this.symbol, this.requested, this.granted, this.status);
+        return new Reservation(this.id, this.symbol,
+                this.requestedBid, this.grantedBid,
+                this.requestedAsk, this.grantedAsk,
+                this.status);
     }
 
     /**
@@ -66,8 +74,10 @@ public class ReservationEntity implements IdentifiableEntity<UUID> {
         return new ReservationEntity(
                 reservation.id(),
                 reservation.symbol(),
-                reservation.requested(),
-                reservation.granted(),
+                reservation.requestedBid(),
+                reservation.grantedBid(),
+                reservation.requestedAsk(),
+                reservation.grantedAsk(),
                 reservation.status()
         );
     }
@@ -86,20 +96,36 @@ public class ReservationEntity implements IdentifiableEntity<UUID> {
         this.symbol = symbol;
     }
 
-    public int getRequested() {
-        return requested;
+    public int getRequestedBid() {
+        return requestedBid;
     }
 
-    public void setRequested(int requested) {
-        this.requested = requested;
+    public void setRequestedBid(int requestedBid) {
+        this.requestedBid = requestedBid;
     }
 
-    public int getGranted() {
-        return granted;
+    public int getGrantedBid() {
+        return grantedBid;
     }
 
-    public void setGranted(int granted) {
-        this.granted = granted;
+    public void setGrantedBid(int grantedBid) {
+        this.grantedBid = grantedBid;
+    }
+
+    public int getRequestedAsk() {
+        return requestedAsk;
+    }
+
+    public void setRequestedAsk(int requestedAsk) {
+        this.requestedAsk = requestedAsk;
+    }
+
+    public int getGrantedAsk() {
+        return grantedAsk;
+    }
+
+    public void setGrantedAsk(int grantedAsk) {
+        this.grantedAsk = grantedAsk;
     }
 
     public ReservationStatus getStatus() {
@@ -115,10 +141,11 @@ public class ReservationEntity implements IdentifiableEntity<UUID> {
         return "ReservationEntity{" +
                 "id=" + id +
                 ", symbol='" + symbol + '\'' +
-                ", requested=" + requested +
-                ", granted=" + granted +
+                ", requestedBid=" + requestedBid +
+                ", grantedBid=" + grantedBid +
+                ", requestedAsk=" + requestedAsk +
+                ", grantedAsk=" + grantedAsk +
                 ", status=" + status +
                 '}';
     }
 }
-
