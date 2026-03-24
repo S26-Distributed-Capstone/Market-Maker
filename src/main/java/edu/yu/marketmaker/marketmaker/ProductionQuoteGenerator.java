@@ -18,7 +18,7 @@ import java.util.UUID;
 
 @Component
 @Primary
-@Profile("!test-position-tracker")
+@Profile("production-quote-generator")
 public class ProductionQuoteGenerator implements QuoteGenerator {
 
     private static final Logger logger = LoggerFactory.getLogger(ProductionQuoteGenerator.class);

@@ -1,16 +1,39 @@
 services:
-  app:
+  market-maker:
     build: .
     environment:
-      - SPRING_PROFILES_ACTIVE=trading-state,test-position-tracker,market-maker-node
+      - SPRING_PROFILES_ACTIVE=test-position-tracker,production-quote-generator,market-maker-node
+      - MARKETMAKER_EXPOSURE_RESERVATION_HOST=exposure-reservation
+      - MARKETMAKER_EXPOSURE_RESERVATION_PORT=7000
     image: market-maker
     ports:
-      - "8080:8080"
-      - "7000:7000"
+      - "9080:8080"
+      - "7001:7000"
     depends_on:
       postgres:
         condition: service_healthy
-  postgres:  # <--- THIS IS THE SERVICE NAME
+      exposure-reservation:
+        condition: service_healthy
+
+  exposure-reservation:
+    build: .
+    environment:
+      - SPRING_PROFILES_ACTIVE=exposure-reservation
+    image: market-maker
+    ports:
+      - "9081:8080"
+      - "7000:7000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
     image: postgres
     environment:
       - POSTGRES_USER=postgres

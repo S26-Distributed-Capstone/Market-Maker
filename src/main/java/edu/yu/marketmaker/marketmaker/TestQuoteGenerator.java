@@ -13,7 +13,7 @@ import edu.yu.marketmaker.model.Position;
 import edu.yu.marketmaker.model.Quote;
 
 @Component
-@Profile("test-position-tracker")
+@Profile("test-quote-generator")
 public class TestQuoteGenerator implements QuoteGenerator {
 
     private final Map<String, AtomicInteger> generatedCountsBySymbol = new ConcurrentHashMap<>();

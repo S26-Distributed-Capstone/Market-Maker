@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@Profile("test-position-tracker")
+@Profile("test-quote-generator")
 @RequestMapping("/test/quote-generator")
 public class TestQuoteGeneratorController {
 

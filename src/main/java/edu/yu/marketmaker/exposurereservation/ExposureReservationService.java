@@ -35,7 +35,11 @@ public class ExposureReservationService {
         logger.info("Creating reservation for Symbol: {}, BidQty: {}, AskQty: {}",
                 quote.symbol(), quote.bidQuantity(), quote.askQuantity());
 
-        release(quote.symbol());
+        try {
+            release(quote.symbol());
+        } catch (RuntimeException ignored) {
+            // No prior reservation for this symbol — nothing to release
+        }
 
         // Calculate current bid and ask usage separately
         int currentBidUsage = reservations.getAll().stream()
