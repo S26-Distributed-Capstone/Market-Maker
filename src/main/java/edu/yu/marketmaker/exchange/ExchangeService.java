@@ -24,10 +24,12 @@ public class ExchangeService {
 
     private Repository<String, Quote> quoteRepository;
     private OrderDispatcher orderDispatcher;
+    private ReservationRequester reservationRequester;
 
-    public ExchangeService(Repository<String, Quote> quoteRepository, OrderDispatcher orderDispatcher) {
+    public ExchangeService(ReservationRequester reservationRequester, Repository<String, Quote> quoteRepository, OrderDispatcher orderDispatcher) {
         this.quoteRepository = quoteRepository;
         this.orderDispatcher = orderDispatcher;
+        this.reservationRequester = reservationRequester;
     }
     
     /**
@@ -53,6 +55,9 @@ public class ExchangeService {
      */
     @PutMapping("/quotes/{symbol}")
     void putQuote(@PathVariable String symbol, @RequestBody Quote quote) {
+        if (quoteRepository.get(symbol) == null) { // this is used for bootstrapping the quotes
+            reservationRequester.sendReservation(quote);
+        }
         quoteRepository.put(quote);
     }
 

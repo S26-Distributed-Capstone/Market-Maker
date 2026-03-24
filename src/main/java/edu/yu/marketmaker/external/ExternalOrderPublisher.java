@@ -1,6 +1,7 @@
 package edu.yu.marketmaker.external;
 
 import edu.yu.marketmaker.model.ExternalOrder;
+import edu.yu.marketmaker.model.Quote;
 import edu.yu.marketmaker.model.Side;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,6 +10,10 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse.BodyHandlers;
+import java.time.Duration;
 import java.util.Random;
 import java.util.List;
 import java.util.Arrays;
@@ -35,10 +40,12 @@ public class ExternalOrderPublisher {
     private PersistentHttpConnection httpConnection;
     private boolean isShutdown;
 
+    private static final long RANDOM_SEED = 1234;
+
     public ExternalOrderPublisher(String exchangeBaseUrl) throws IOException {
         this.exchangeBaseUrl = exchangeBaseUrl;
         this.symbols = Arrays.asList("AAPL", "MSFT", "GOOG", "TSLA");
-        this.random = new Random();
+        this.random = new Random(RANDOM_SEED);
         this.isShutdown = false;
     }
 
@@ -67,15 +74,49 @@ public class ExternalOrderPublisher {
     }
 
     /**
+     * Generate and send the initial version of the quotes for the symbols
+     */
+    public void sendInitialQuotes() throws IOException {
+        logger.info("Generating initial quote for symbols: {}", symbols);
+        HttpClient client = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_2)
+                .connectTimeout(Duration.ofSeconds(5))
+                .build();
+        for (String symbol : symbols) {
+            Quote quote = new Quote(
+                symbol,
+                100 + (random.nextDouble() * 10 - 5), 20,
+                100 + (random.nextDouble() * 10 - 5), 20,
+                java.util.UUID.randomUUID(), System.currentTimeMillis() + 30_000
+            );
+            logger.info("Sending quote for symbol: {}", symbol);
+            ObjectMapper mapper = JsonMapper.builder().findAndAddModules().build();
+            try {
+                String serializedQuote = mapper.writeValueAsString(quote);
+                HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(this.exchangeBaseUrl).resolve("/quotes/" + symbol))
+                    .header("Content-Type", "application/json")
+                    .PUT(HttpRequest.BodyPublishers.ofString(serializedQuote))
+                    .build();
+                client.send(request, BodyHandlers.discarding());
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                logger.error("Failed to serialize quote to JSON: {}", e);
+            } catch (InterruptedException e) {
+                logger.error("Interrupted before quote could be sent", e);
+            }
+        }
+    }
+
+    /**
      * Generate and submit random orders continuously.
      * Creates a concurrent load by submitting orders for multiple symbols simultaneously.
      */
     public void startGeneratingOrders() throws IOException {
         logger.info("Starting order generation for symbols: {}", symbols);
 
-        this.httpConnection = new PersistentHttpConnection(URI.create(this.exchangeBaseUrl));
+        this.httpConnection = new PersistentHttpConnection(URI.create(this.exchangeBaseUrl).resolve("/orders"));
 
-        while (!this.isShutdown) {
+        while (!isShutdown) {
             for (int i=0; i < this.random.nextInt(20); i++) { // Generate 10 orders per batch
                 for (String symbol : symbols) {
                     generateRandomOrder(symbol);
@@ -116,7 +157,7 @@ public class ExternalOrderPublisher {
     /**
      * Stop generating orders.
      */
-    public void stop() throws IOException {
+    public void stop() {
         logger.info("Stopping order generation");
 
         // TODO: Implement graceful shutdown
@@ -124,5 +165,9 @@ public class ExternalOrderPublisher {
         // - Wait for in-flight requests to complete
 
         this.isShutdown = true;
+        httpConnection.shutdown();
+        logger.info("Done generating. Success Rate: {}%",
+            String.format("%.2f", httpConnection.getSuccessRate() * 100)
+        );
     }
 }
