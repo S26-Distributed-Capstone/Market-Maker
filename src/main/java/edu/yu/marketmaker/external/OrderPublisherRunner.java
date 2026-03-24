@@ -1,22 +1,25 @@
 package edu.yu.marketmaker.external;
 
-import edu.yu.marketmaker.external.ExternalOrderPublisher;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
-import org.springframework.context.annotation.Profile;
-import org.springframework.stereotype.Component;
+import java.io.IOException;
 
-@Component
-@Profile("external-publisher")
-public class OrderPublisherRunner implements ApplicationRunner {
+public class OrderPublisherRunner {
 
-    @Value("${exchange.base-url}")
-    private String exchangeBaseUrl;
+    public static void main(String[] args) {
+        try {
+            ExternalOrderPublisher publisher = new ExternalOrderPublisher("http://localhost:8080");
+            Runtime.getRuntime().addShutdownHook(
+                new Thread(() -> {publisher.stop();})
+            );
+            if (shouldInitialize(args)) {
+                publisher.sendInitialQuotes();
+            }
+            publisher.startGeneratingOrders();
+        } catch (IOException e) {
+            System.out.println("Error");
+        }
+    }
 
-    @Override
-    public void run(ApplicationArguments args) throws Exception {
-        ExternalOrderPublisher publisher = new ExternalOrderPublisher(exchangeBaseUrl);
-        publisher.startGeneratingOrders();
+    private static boolean shouldInitialize(String[] args) {
+        return args.length == 0 || !args[0].equals("--continue");
     }
 }
