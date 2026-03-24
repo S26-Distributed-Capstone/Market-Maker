@@ -2,7 +2,7 @@ services:
   app:
     build: .
     environment:
-      - SPRING_PROFILES_ACTIVE=trading-state
+      - SPRING_PROFILES_ACTIVE=trading-state,test-position-tracker,market-maker-node
     image: market-maker
     ports:
       - "8080:8080"

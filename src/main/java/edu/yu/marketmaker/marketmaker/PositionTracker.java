@@ -1,5 +1,6 @@
 package edu.yu.marketmaker.marketmaker;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.messaging.rsocket.RSocketRequester;
 import org.springframework.stereotype.Component;
 
@@ -10,8 +11,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
-public class PositionTracker {
-    
+@Profile("!test-position-tracker")
+public class PositionTracker implements SnapshotTracker {
+
     private final RSocketRequester requester;
     private final Set<String> trackedSymbols;
 

@@ -9,6 +9,7 @@ import edu.yu.marketmaker.model.Side;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.context.annotation.Primary;
 import org.springframework.messaging.rsocket.RSocketRequester;
 import org.springframework.stereotype.Component;
@@ -17,6 +18,7 @@ import java.util.UUID;
 
 @Component
 @Primary
+@Profile("!test-position-tracker")
 public class ProductionQuoteGenerator implements QuoteGenerator {
 
     private static final Logger logger = LoggerFactory.getLogger(ProductionQuoteGenerator.class);
