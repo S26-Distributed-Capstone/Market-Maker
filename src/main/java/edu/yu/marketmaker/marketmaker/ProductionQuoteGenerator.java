@@ -62,6 +62,14 @@ public class ProductionQuoteGenerator implements QuoteGenerator {
             bidQuantity += 2;
         }
 
+        // --- NEW LOGIC: Enforce Individual Position Limits (±100) ---
+        int maxAllowedBid = Math.max(0, 100 - position.netQuantity());
+        bidQuantity = Math.min(bidQuantity, maxAllowedBid);
+
+        int maxAllowedAsk = Math.max(0, 100 + position.netQuantity());
+        askQuantity = Math.min(askQuantity, maxAllowedAsk);
+        // -----------------------------------------------------------
+
         double bidPrice = Math.max(0.01, referencePrice - halfSpread);
         double askPrice = Math.max(bidPrice, referencePrice + halfSpread);
 
