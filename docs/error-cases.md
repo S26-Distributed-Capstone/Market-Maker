@@ -1,5 +1,9 @@
 # Error Cases
 
+Error cases are scenarios where a service or component goes down or fails unexpectedly. Client-side behavior (expired quotes, bad prices, partial fills, denied reservations) is documented in the workflow cases.
+
+---
+
 ## Submitting External Orders
 
 ### Error Case 1: Exchange goes down before handling the order
@@ -62,64 +66,9 @@ sequenceDiagram
 
 ---
 
-### Error Case 4: Order submitted against an expired quote
-```mermaid
-sequenceDiagram
-  participant user as External Order Publisher
-  participant exchange as Exchange Service
-  user->>exchange: Submit order (POST /orders)
-  exchange->>exchange: Look up active quote
-  exchange->>exchange: Check expiresAt < currentTime
-  Note over exchange: Quote has expired
-  exchange->>user: Reject: "Quote is expired"
-```
-**Outcome:** The exchange checks `expiresAt` before matching. Expired quotes are never filled. The publisher receives a 400 error and may retry later when a fresh quote is available.
-
----
-
-### Error Case 5: Order quantity exceeds remaining quote quantity
-```mermaid
-sequenceDiagram
-  participant user as External Order Publisher
-  participant exchange as Exchange Service
-  participant state as Trading State Service
-  user->>exchange: Submit order (qty=15)
-  exchange->>exchange: Active quote has remaining qty=10
-  exchange->>exchange: Partial fill: adjustedQty = min(15, 10) = 10
-  exchange->>exchange: Quote remaining qty → 0
-  exchange->>state: Send fill (qty=10)
-  exchange->>user: Report success (partial fill)
-```
-**Outcome:** The order is partially filled against the remaining quote quantity. The fill reflects only the actually executed quantity. The quote's remaining quantity is decremented accordingly.
-
----
-
-### Error Case 6: Concurrent orders race on same quote
-```mermaid
-sequenceDiagram
-  participant user1 as Publisher Thread 1
-  participant user2 as Publisher Thread 2
-  participant exchange as Exchange Service
-  participant state as Trading State Service
-  user1->>exchange: Submit BUY order (qty=8)
-  user2->>exchange: Submit BUY order (qty=8)
-  Note over exchange: Quote bidQuantity = 10
-  exchange->>exchange: Thread 1: adjustedQty = min(8, 10) = 8
-  exchange->>exchange: Thread 1: update quote bidQty = 2
-  exchange->>state: Send fill (qty=8)
-  exchange->>exchange: Thread 2: adjustedQty = min(8, 2) = 2
-  exchange->>exchange: Thread 2: update quote bidQty = 0
-  exchange->>state: Send fill (qty=2)
-  Note over exchange: Without synchronization on quote updates,
-  Note over exchange: race conditions could cause over-fills
-```
-**Outcome:** If the exchange does not synchronize access to the quote's remaining quantity, two concurrent orders could both read the same remaining quantity and over-fill. A non-atomic read-modify-write on the quote is a potential concurrency issue. Using locks or an atomic compare-and-swap would prevent this.
-
----
-
 ## Updating Quote
 
-### Error Case 7: Market maker goes down before handling the position update
+### Error Case 4: Market maker goes down before handling the position update
 ```mermaid
 sequenceDiagram
   participant state as Trading State Service
@@ -137,7 +86,7 @@ sequenceDiagram
 
 ---
 
-### Error Case 8: Market maker goes down after sending reservation but before sending new quote
+### Error Case 5: Market maker goes down after sending reservation but before sending new quote
 ```mermaid
 sequenceDiagram
   participant state as Trading State Service
@@ -160,7 +109,7 @@ sequenceDiagram
 
 ---
 
-### Error Case 9: Reservation service goes down before updating reservation
+### Error Case 6: Reservation service goes down before updating reservation
 ```mermaid
 sequenceDiagram
   participant state as Trading State Service
@@ -180,7 +129,7 @@ sequenceDiagram
 
 ---
 
-### Error Case 10: Exchange service goes down before updating quote
+### Error Case 7: Exchange service goes down before updating quote
 ```mermaid
 sequenceDiagram
   participant state as Trading State Service
@@ -205,85 +154,9 @@ sequenceDiagram
 
 ---
 
-### Error Case 11: Reservation is partially granted
-```mermaid
-sequenceDiagram
-  participant state as Trading State Service
-  participant maker as Market Maker Node
-  participant reservation as Exposure Reservation Service
-  participant exchange as Exchange Service
-  state->>maker: Position update (position = -80)
-  maker->>maker: Generate quote: bid=10, ask=10
-  maker->>reservation: Request reservation (ask=10)
-  reservation->>reservation: Available capacity = 5
-  reservation->>maker: Partial grant (granted=5, status=PARTIAL)
-  maker->>maker: Reduce ask quantity to 5
-  maker->>exchange: Publish quote (bid=10, ask=5)
-  exchange->>exchange: Activate reduced quote
-```
-**Outcome:** When insufficient exposure capacity exists, the reservation service grants only what is available. The market maker deterministically reduces the quote quantity to match and publishes a smaller quote. This prevents exposure limit violations while still providing some liquidity.
-
----
-
-### Error Case 12: Reservation denied entirely
-```mermaid
-sequenceDiagram
-  participant state as Trading State Service
-  participant maker as Market Maker Node
-  participant reservation as Exposure Reservation Service
-  state->>maker: Position update
-  maker->>maker: Generate quote: bid=10, ask=10
-  maker->>reservation: Request reservation (ask=10)
-  reservation->>reservation: Available capacity = 0
-  reservation->>maker: Denied (granted=0, status=DENIED)
-  Note over maker: Cannot publish quote
-  Note over maker: Allow existing quote to expire
-  Note over maker: Retry on next position update
-```
-**Outcome:** No exposure capacity is available. The market maker cannot publish a quote for this symbol. The existing quote (if any) expires naturally. The market maker will retry when it receives the next position update or when capacity becomes available.
-
----
-
-### Error Case 13: Stale position update arrives after a newer one
-```mermaid
-sequenceDiagram
-  participant state as Trading State Service
-  participant maker as Market Maker Node
-  state->>maker: Position update (version=5)
-  maker->>maker: Process and publish quote for version 5
-  state->>maker: Position update (version=4, delayed/reordered)
-  maker->>maker: Check: version 4 < last seen version 5
-  maker->>maker: Discard stale update
-  Note over maker: Quote from version 5 remains active
-```
-**Outcome:** The market maker tracks the last processed position version per symbol. Updates with older versions are discarded to prevent stale quotes from overriding newer state.
-
----
-
-### Error Case 14: Quote expires before it can be refreshed
-```mermaid
-sequenceDiagram
-  participant maker as Market Maker Node
-  participant reservation as Exposure Reservation Service
-  participant exchange as Exchange Service
-  Note over exchange: Active quote TTL = 30s
-  Note over exchange: 30 seconds pass with no refresh
-  exchange->>exchange: Quote expires, no longer fillable
-  maker->>maker: Detect quote expiration
-  maker->>reservation: Release reservation (POST /reservations/{id}/release)
-  reservation->>reservation: Free capacity
-  maker->>maker: Generate fresh quote
-  maker->>reservation: Request new reservation
-  reservation->>maker: Granted
-  maker->>exchange: Publish new quote (PUT /quotes/{symbol})
-```
-**Outcome:** When a quote expires, the exchange stops filling it. The market maker must detect this and release the associated reservation, then publish a fresh quote. If the market maker fails to release, the capacity leaks until the reservation's own expiration mechanism triggers.
-
----
-
 ## Streaming Position Data Updates
 
-### Error Case 15: Connected trading state service goes down
+### Error Case 8: Connected trading state service goes down
 ```mermaid
 sequenceDiagram
   participant frontend as Position Display UI
@@ -306,7 +179,7 @@ sequenceDiagram
 
 ## Exposure Lifecycle Errors
 
-### Error Case 16: Fill arrives but reservation apply-fill fails
+### Error Case 9: Fill arrives but reservation apply-fill fails
 ```mermaid
 sequenceDiagram
   participant exchange as Exchange Service
@@ -327,7 +200,7 @@ sequenceDiagram
 
 ---
 
-### Error Case 17: Market maker crashes during quote replacement cycle
+### Error Case 10: Market maker crashes during quote replacement cycle
 ```mermaid
 sequenceDiagram
   participant state as Trading State Service
@@ -350,7 +223,7 @@ sequenceDiagram
 
 ## Full System Restart
 
-### Error Case 18: Recovery after full system restart
+### Error Case 11: Recovery after full system restart
 ```mermaid
 sequenceDiagram
   participant pg as PostgreSQL
