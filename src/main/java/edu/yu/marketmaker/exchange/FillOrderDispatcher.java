@@ -35,43 +35,42 @@ public class FillOrderDispatcher implements OrderDispatcher {
         double price = 0.0;
         switch (order.side()) {
             case BUY:
-                if (order.limitPrice() > quote.bidPrice()) {
-                    throw new OrderValidationException("Limit price is too low");
+                if (order.limitPrice() < quote.askPrice()) {
+                    throw new OrderValidationException("Limit price too low to cross ask");
                 } else {
-                    price = quote.bidPrice();
+                    price = quote.askPrice();
                 }
                 break;
             case SELL:
-                if (order.limitPrice() < quote.askPrice()) {
-                    throw new OrderValidationException("Limit price is too high");
+                if (order.limitPrice() > quote.bidPrice()) {
+                    throw new OrderValidationException("Limit price too high to cross bid");
                 } else {
-                    price = quote.askPrice();
+                    price = quote.bidPrice();
                 }
         }
         int adjustedQuantity = adjustQuantity(quote, order);
         if (adjustedQuantity == 0) {
             throw new OrderValidationException("Order could not be filled");
         }
-        Fill fill = new Fill(order.id(), order.symbol(), order.side(), adjustedQuantity, price, null, timestamp);
+        Fill fill = new Fill(order.id(), order.symbol(), order.side(), adjustedQuantity, price, quote.quoteId(), timestamp);
         fillSender.sendFill(fill);
     }
 
     private int adjustQuantity(Quote quote, ExternalOrder order) {
-        int adjustedQuantity = Math.min(order.side() == Side.BUY ? quote.bidQuantity() : quote.askQuantity(), order.quantity());
+        int adjustedQuantity = Math.min(order.side() == Side.BUY ? quote.askQuantity() : quote.bidQuantity(), order.quantity());
         quoteRepository.put(updateQuote(quote, order.side(), adjustedQuantity));
         return adjustedQuantity;
     }
 
     private Quote updateQuote(Quote quote, Side side, int amount) {
         return new Quote(
-            quote.symbol(),
-            quote.bidPrice(),
-            side == Side.BUY ? quote.bidQuantity() - amount : quote.bidQuantity(),
-            quote.askPrice(),
-            side == Side.SELL ? quote.askQuantity() - amount : quote.askQuantity(),
-            quote.quoteId(),
-            quote.expiresAt() 
+                quote.symbol(),
+                quote.bidPrice(),
+                side == Side.SELL ? quote.bidQuantity() - amount : quote.bidQuantity(),
+                quote.askPrice(),
+                side == Side.BUY ? quote.askQuantity() - amount : quote.askQuantity(),
+                quote.quoteId(),
+                quote.expiresAt()
         );
     }
-    
 }
