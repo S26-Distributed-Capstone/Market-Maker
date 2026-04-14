@@ -106,10 +106,6 @@ public class TradingStateService {
     private void processFill(Fill fill) {
         logger.info("Processing fill: id={}, symbol={}, side={}, quantity={}", fill.getId(), fill.symbol(), fill.side(), fill.quantity());
         Optional<Position> position = positionRepository.get(fill.symbol());
-        if (position.isEmpty() && fill.side() == Side.SELL) {
-            logger.warn("Rejected fill: cannot SELL with no existing position for symbol={}", fill.symbol());
-            throw new IllegalArgumentException("Cannot sell with no existing position for: " + fill.symbol());
-        }
         fillRepository.put(fill);
         int quantity = fill.side() == Side.BUY ? fill.quantity() : -fill.quantity();
         Position updatedPosition;

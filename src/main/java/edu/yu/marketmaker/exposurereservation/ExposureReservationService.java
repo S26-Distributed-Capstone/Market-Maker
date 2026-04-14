@@ -35,10 +35,9 @@ public class ExposureReservationService {
         logger.info("Creating reservation for Symbol: {}, BidQty: {}, AskQty: {}",
                 quote.symbol(), quote.bidQuantity(), quote.askQuantity());
 
-        try {
+        // Quote replacement: release the old reservation first if this symbol is already active.
+        if (reservations.get(quote.symbol()).isPresent()) {
             release(quote.symbol());
-        } catch (RuntimeException ignored) {
-            // No prior reservation for this symbol — nothing to release
         }
 
         // Calculate current bid and ask usage separately

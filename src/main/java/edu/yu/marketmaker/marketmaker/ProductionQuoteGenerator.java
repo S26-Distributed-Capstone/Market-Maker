@@ -44,19 +44,20 @@ public class ProductionQuoteGenerator implements QuoteGenerator {
 
     @Override
     public Quote generateQuote(Position position, Fill lastFill) {
-        Quote current = quoteRepository.get(lastFill.symbol()).orElse(null);
+        String symbol = lastFill != null ? lastFill.symbol() : position.symbol();
+        Quote current = quoteRepository.get(symbol).orElse(null);
 
-        double referencePrice = current != null ? midPrice(current) : lastFill.price();
+        double referencePrice = current != null ? midPrice(current) : (lastFill != null ? lastFill.price() : 100.0);
         double halfSpread = targetSpread / 2.0;
         int bidQuantity = current != null ? Math.max(0, current.bidQuantity()) : Math.max(1, defaultQuantity);
         int askQuantity = current != null ? Math.max(0, current.askQuantity()) : Math.max(1, defaultQuantity);
 
         // Simple inventory-aware skew based on the last fill side.
-        if (lastFill.side() == Side.SELL) {//raise price
+        if (lastFill != null && lastFill.side() == Side.SELL) {//raise price
             referencePrice += 0.01 * lastFill.quantity();
             askQuantity += 2;
             bidQuantity = Math.max(0, bidQuantity - 1);
-        } else if (lastFill.side() == Side.BUY) {//lower price
+        } else if (lastFill != null && lastFill.side() == Side.BUY) {//lower price
             referencePrice -= 0.01 * lastFill.quantity();
             askQuantity = Math.max(0, askQuantity - 1);
             bidQuantity += 2;
@@ -74,7 +75,7 @@ public class ProductionQuoteGenerator implements QuoteGenerator {
         double askPrice = Math.max(bidPrice, referencePrice + halfSpread);
 
         Quote proposed = new Quote(
-                lastFill.symbol(),
+                symbol,
                 bidPrice,
                 bidQuantity,
                 askPrice,
