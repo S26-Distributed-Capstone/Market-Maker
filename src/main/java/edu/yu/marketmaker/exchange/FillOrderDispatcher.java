@@ -57,14 +57,14 @@ public class FillOrderDispatcher implements OrderDispatcher {
         switch (order.side()) {
             case BUY:
                 if (order.limitPrice() < quote.askPrice()) {
-                    throw new OrderValidationException("Limit price is too low");
+                    throw new OrderValidationException("Limit price too low to cross ask");
                 } else {
                     price = quote.askPrice();
                 }
                 break;
             case SELL:
                 if (order.limitPrice() > quote.bidPrice()) {
-                    throw new OrderValidationException("Limit price is too high");
+                    throw new OrderValidationException("Limit price too high to cross bid");
                 } else {
                     price = quote.bidPrice();
                 }

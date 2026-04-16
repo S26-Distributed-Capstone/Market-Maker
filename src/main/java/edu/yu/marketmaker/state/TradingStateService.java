@@ -96,12 +96,11 @@ public class TradingStateService {
 
     /**
      * Shared logic for both HTTP and RSocket submitFill endpoints.
-     * Validates the fill, persists it, updates the position, and broadcasts
+     * Persists the fill, updates the position, and broadcasts
      * a {@link StateSnapshot} to all active {@code state.stream} subscribers.
      *
      * @param fill the fill to process
-     * @throws IllegalArgumentException if selling with no existing position
-     * @throws HazelcastException       if the underlying repository fails
+     * @throws HazelcastException if the underlying repository fails
      */
     private void processFill(Fill fill) {
         logger.info("Processing fill: id={}, symbol={}, side={}, quantity={}", fill.getId(), fill.symbol(), fill.side(), fill.quantity());
