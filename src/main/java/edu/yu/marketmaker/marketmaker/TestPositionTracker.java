@@ -58,11 +58,6 @@ public class TestPositionTracker implements SnapshotTracker {
 		return ResponseEntity.noContent().build();
 	}
 
-	@PostMapping("/symbols/{symbol}")
-	public ResponseEntity<Void> addTrackedSymbolPost(@PathVariable String symbol) {
-		return addTrackedSymbol(symbol);
-	}
-
 	@GetMapping("/received/{symbol}")
 	public ResponseEntity<Boolean> hasReceivedSymbol(@PathVariable String symbol) {
 		if (symbol == null || symbol.isBlank()) {

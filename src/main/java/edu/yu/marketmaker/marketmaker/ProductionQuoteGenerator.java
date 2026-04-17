@@ -5,7 +5,6 @@ import edu.yu.marketmaker.model.Fill;
 import edu.yu.marketmaker.model.Position;
 import edu.yu.marketmaker.model.Quote;
 import edu.yu.marketmaker.model.ReservationResponse;
-import edu.yu.marketmaker.model.Side;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +27,15 @@ public class ProductionQuoteGenerator implements QuoteGenerator {
     private final double targetSpread;
     private final Repository<String, Quote> quoteRepository;
 
+    /**
+     * Constructor for production quote generator. 
+     * @param rsocketRequesterBuilder
+     * @param quoteRepository
+     * @param reservationHost
+     * @param reservationPort
+     * @param defaultQuantity
+     * @param targetSpread
+     */
     public ProductionQuoteGenerator(
             RSocketRequester.Builder rsocketRequesterBuilder,
             Repository<String, Quote> quoteRepository,
@@ -42,6 +50,17 @@ public class ProductionQuoteGenerator implements QuoteGenerator {
         this.quoteRepository = quoteRepository;
     }
 
+    /**
+     * Generates a quote based on the current position and last fill.
+     * Only thread safe assuming one market maker instance per symbol, 
+     * as the quote repository is shared and not synchronized. 
+     * In a real implementation, we would need to ensure thread safety 
+     * at the repository level or use a more sophisticated state management approach.
+     *
+     * @param position The current position.
+     * @param lastFill The last fill.
+     * @return The generated quote.
+     */
     @Override
     public Quote generateQuote(Position position, Fill lastFill) {
         String symbol = lastFill != null ? lastFill.symbol() : position.symbol();
@@ -53,14 +72,19 @@ public class ProductionQuoteGenerator implements QuoteGenerator {
         int askQuantity = current != null ? Math.max(0, current.askQuantity()) : Math.max(1, defaultQuantity);
 
         // Simple inventory-aware skew based on the last fill side.
-        if (lastFill != null && lastFill.side() == Side.SELL) {//raise price
-            referencePrice += 0.01 * lastFill.quantity();
-            askQuantity += 2;
-            bidQuantity = Math.max(0, bidQuantity - 1);
-        } else if (lastFill != null && lastFill.side() == Side.BUY) {//lower price
-            referencePrice -= 0.01 * lastFill.quantity();
-            askQuantity = Math.max(0, askQuantity - 1);
-            bidQuantity += 2;
+        if (lastFill != null) {
+            switch (lastFill.side()) {
+                case SELL -> { // raise price
+                    referencePrice += 0.01 * lastFill.quantity();
+                    askQuantity += 2;
+                    bidQuantity = Math.max(0, bidQuantity - 1);
+                }
+                case BUY -> { // lower price
+                    referencePrice -= 0.01 * lastFill.quantity();
+                    askQuantity = Math.max(0, askQuantity - 1);
+                    bidQuantity += 2;
+                }
+            }
         }
 
         // --- NEW LOGIC: Enforce Individual Position Limits (±100) ---

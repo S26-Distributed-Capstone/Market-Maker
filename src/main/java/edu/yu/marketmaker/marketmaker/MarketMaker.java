@@ -28,14 +28,10 @@ public class MarketMaker implements ApplicationRunner {
         if (snapshot == null || snapshot.position() == null || snapshot.position().symbol() == null) {
             return;
         }
-        if (!handlesSymbol(snapshot.position().symbol()) || !newVersion(snapshot.position())) {
+        if (!positionTracker.handlesSymbol(snapshot.position().symbol()) || !newVersion(snapshot.position())) {
             return;
         }
         quoteGenerator.generateQuote(snapshot.position(), snapshot.fill());
-    }
-
-    private boolean handlesSymbol(String symbol) {
-        return positionTracker.handlesSymbol(symbol);
     }
 
     private boolean newVersion(Position position) {
