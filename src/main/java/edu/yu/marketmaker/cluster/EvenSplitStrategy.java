@@ -10,14 +10,13 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Pure assignment policy: distribute a set of symbols across a set of worker
- * nodes as evenly as possible, deterministically. The strategy is intentionally
- * stateless and side-effect-free so it can be unit-tested in isolation; the
- * Coordinator wraps it in I/O.
+ * Pure assignment policy: distribute symbols across workers as evenly as
+ * possible, deterministically. Stateless and side-effect-free so it unit-tests
+ * without ZK or Spring; the Coordinator wraps it in I/O.
  *
- * "Even split" here means symbols are dealt out round-robin across
- * sorted-by-id workers — assignments differ in size by at most one, and
- * the mapping is a deterministic function of the (workers, symbols) inputs.
+ * "Even split" means round-robin dealing across sorted-by-id workers —
+ * assignments differ in size by at most one, and the mapping is a
+ * deterministic function of the inputs.
  */
 public final class EvenSplitStrategy {
 
@@ -25,14 +24,13 @@ public final class EvenSplitStrategy {
     private EvenSplitStrategy() {}
 
     /**
-     * Distribute {@code symbols} across {@code workers} as evenly as possible.
-     * Both inputs are sorted before assignment, so the output is deterministic
-     * for any given pair of input sets (regardless of iteration order).
+     * Distribute {@code symbols} across {@code workers} evenly. Inputs are
+     * sorted, so output is deterministic regardless of iteration order.
      *
-     * @param workers worker node ids eligible to receive assignments (leader excluded by caller)
-     * @param symbols symbols to assign across the workers
-     * @return map from worker id to assigned symbols; every worker gets an entry
-     *         (possibly empty). If {@code workers} is empty the returned map is empty.
+     * @param workers worker ids eligible for assignment (leader excluded by caller)
+     * @param symbols symbols to assign
+     * @return map from worker id to assigned symbols; every worker gets an
+     *         entry (possibly empty). Empty map if {@code workers} is empty.
      */
     public static Map<String, List<String>> split(Collection<String> workers, Collection<String> symbols) {
         List<String> sortedWorkers = new ArrayList<>(new TreeSet<>(workers));
@@ -53,14 +51,13 @@ public final class EvenSplitStrategy {
     }
 
     /**
-     * Identify workers whose assignment is identical between two rebalance
-     * snapshots — used by callers that want to skip writing unchanged
-     * assignment znodes (currently informational; the Coordinator writes
-     * unconditionally for simplicity).
+     * Identify workers whose assignment is identical between two snapshots.
+     * The Coordinator uses this to skip writing znodes whose contents didn't
+     * change, avoiding spurious watch fires on every worker.
      *
-     * @param previous the prior assignment map (may omit workers, which are treated as having no symbols)
-     * @param next     the new assignment map under consideration
-     * @return the set of worker ids whose assigned list did not change
+     * @param previous prior assignments (missing workers = no symbols)
+     * @param next     new assignments
+     * @return worker ids whose list did not change
      */
     public static Set<String> unchangedWorkers(Map<String, List<String>> previous, Map<String, List<String>> next) {
         Set<String> unchanged = new TreeSet<>();

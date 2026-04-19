@@ -35,8 +35,16 @@ public class MarketMaker implements ApplicationRunner {
     }
 
     private boolean newVersion(Position position) {
-        Long previous = lastProcessedVersionBySymbol.put(position.symbol(), position.version());
-        return previous == null || position.version() > previous;
+        long incoming = position.version();
+        boolean[] isNew = {false};
+        lastProcessedVersionBySymbol.compute(position.symbol(), (k, prev) -> {
+            if (prev == null || incoming > prev) {
+                isNew[0] = true;
+                return incoming;
+            }
+            return prev;
+        });
+        return isNew[0];
     }
 
     public boolean addSymbol(String symbol) {
@@ -44,7 +52,11 @@ public class MarketMaker implements ApplicationRunner {
     }
 
     public boolean removeSymbol(String symbol) {
-        return positionTracker.removeSymbol(symbol);
+        boolean removed = positionTracker.removeSymbol(symbol);
+        if (removed) {
+            lastProcessedVersionBySymbol.remove(symbol);
+        }
+        return removed;
     }
 
     @Override

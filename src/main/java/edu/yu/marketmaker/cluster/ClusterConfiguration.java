@@ -9,36 +9,27 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
 /**
- * Spring {@code @Configuration} that owns the ZooKeeper-side beans
- * required by every cluster component: a started {@link CuratorFramework}
- * client and a {@link ZkPaths} helper rooted at the configured base path.
+ * Owns the ZK-side beans every cluster component needs: a started
+ * {@link CuratorFramework} and a {@link ZkPaths} helper.
  *
- * Active only on the {@code market-maker-node} profile so the rest of the
- * application (trading-state, exchange, etc.) does not pull in ZK at boot.
+ * Only active on the {@code market-maker-node} profile, so other parts of
+ * the app don't pull in ZK at boot.
  */
 @Configuration
 @Profile("market-maker-node")
 @EnableConfigurationProperties(ClusterProperties.class)
 public class ClusterConfiguration {
 
-    /**
-     * Build the {@link ZkPaths} helper from the configured base path.
-     *
-     * @param props loaded cluster configuration
-     * @return a path builder shared by every cluster bean
-     */
+    /** @return the shared path helper rooted at the configured base path. */
     @Bean
     public ZkPaths zkPaths(ClusterProperties props) {
         return new ZkPaths(props.getZkBasePath());
     }
 
     /**
-     * Build, start, and register the Curator client for shutdown via
-     * {@code destroyMethod = "close"}. Uses an exponential backoff retry
-     * policy so transient ZK hiccups don't tear the application down.
-     *
-     * @param props loaded cluster configuration
-     * @return a started {@link CuratorFramework} ready for use
+     * Build and start the Curator client. Uses exponential backoff so a
+     * transient ZK hiccup doesn't take the app down. Closed on shutdown via
+     * {@code destroyMethod = "close"}.
      */
     @Bean(destroyMethod = "close")
     public CuratorFramework curatorFramework(ClusterProperties props) {

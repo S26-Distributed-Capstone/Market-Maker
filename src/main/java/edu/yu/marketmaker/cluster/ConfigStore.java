@@ -21,20 +21,18 @@ import java.util.LinkedHashSet;
 import java.util.List;
 
 /**
- * Read/write façade over the {@code /marketmaker/symbols} znode, which
- * holds the cluster's authoritative ticker list as a JSON array.
+ * Read/write facade over the {@code /marketmaker/symbols} znode, which
+ * holds the cluster's ticker list as a JSON array.
  *
  * Responsibilities:
  * <ul>
- *   <li>Serialise/deserialise the symbol list to/from ZooKeeper.</li>
- *   <li>Provide atomic add/remove operations (synchronised at the JVM level —
- *       only the leader mutates the znode at runtime).</li>
- *   <li>On first leadership acquisition, seed the znode from a mounted
- *       {@code symbols.txt} file so the cluster comes up with a sensible
- *       default rather than an empty book.</li>
+ *   <li>Serialize/deserialize the symbol list to/from ZK.</li>
+ *   <li>Atomic add/remove (JVM-level synchronized; only the leader writes).</li>
+ *   <li>Seed the znode from {@code symbols.txt} on first leadership so the
+ *       cluster boots with a sensible default.</li>
  * </ul>
  *
- * Symbols are normalised to upper-case on the way in.
+ * Symbols are uppercased on the way in.
  */
 @Component
 @Profile("market-maker-node")
@@ -48,13 +46,6 @@ public class ConfigStore {
     private final ClusterProperties props;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    /**
-     * Construct the config store with its ZK and configuration dependencies.
-     *
-     * @param curator started Curator client
-     * @param paths   path helper for the symbols znode
-     * @param props   cluster configuration (used for the seed-file location)
-     */
     public ConfigStore(CuratorFramework curator, ZkPaths paths, ClusterProperties props) {
         this.curator = curator;
         this.paths = paths;
@@ -62,10 +53,8 @@ public class ConfigStore {
     }
 
     /**
-     * Read the current symbol list from ZooKeeper.
-     *
-     * @return the symbol list, or an empty list if the znode is missing or empty
-     * @throws ClusterException if the znode exists but cannot be read or parsed
+     * @return the symbol list, or empty if the znode is missing or empty
+     * @throws ClusterException if the znode cannot be read or parsed
      */
     public List<String> readSymbols() {
         try {
@@ -82,11 +71,10 @@ public class ConfigStore {
     }
 
     /**
-     * Replace the symbol list in ZooKeeper with {@code symbols}, deduplicating
-     * while preserving insertion order. Creates the znode if it does not exist.
+     * Replace the symbol list with {@code symbols}, deduplicating while
+     * preserving insertion order. Creates the znode if missing.
      *
-     * @param symbols the new symbol list to persist
-     * @throws ClusterException on serialisation or ZK failure
+     * @throws ClusterException on serialization or ZK failure
      */
     public void writeSymbols(List<String> symbols) {
         List<String> normalized = new ArrayList<>(new LinkedHashSet<>(symbols));
@@ -112,10 +100,10 @@ public class ConfigStore {
     }
 
     /**
-     * Append a symbol to the persistent list. No-op if already present.
+     * Append a symbol. No-op if already present.
      *
-     * @param symbol the ticker to add (case-insensitive; whitespace trimmed)
-     * @return {@code true} if the symbol was newly added; {@code false} if it was already present
+     * @param symbol ticker to add (case-insensitive; trimmed)
+     * @return {@code true} if newly added; {@code false} if it was already there
      * @throws IllegalArgumentException if the symbol is null or blank
      */
     public synchronized boolean addSymbol(String symbol) {
@@ -131,10 +119,10 @@ public class ConfigStore {
     }
 
     /**
-     * Remove a symbol from the persistent list. No-op if not present.
+     * Remove a symbol. No-op if not present.
      *
-     * @param symbol the ticker to remove (case-insensitive; whitespace trimmed)
-     * @return {@code true} if the symbol was present and removed; {@code false} otherwise
+     * @param symbol ticker to remove (case-insensitive; trimmed)
+     * @return {@code true} if removed; {@code false} otherwise
      * @throws IllegalArgumentException if the symbol is null or blank
      */
     public synchronized boolean removeSymbol(String symbol) {
@@ -150,9 +138,8 @@ public class ConfigStore {
     }
 
     /**
-     * Bootstrap the symbol znode from {@code cluster.symbols-seed-file}
-     * if the znode is currently empty. Idempotent — safe to call on every
-     * leadership acquisition.
+     * Seed the symbol znode from {@code cluster.symbols-seed-file} if empty.
+     * Idempotent — safe to call on every leadership acquisition.
      */
     public void seedIfEmpty() {
         List<String> existing = readSymbols();
@@ -171,9 +158,9 @@ public class ConfigStore {
     }
 
     /**
-     * Parse the seed file, ignoring blank lines and lines beginning with {@code '#'}.
+     * Parse the seed file, skipping blank lines and {@code '#'} comments.
      *
-     * @return distinct, normalised symbols from the file (empty if the file does not exist)
+     * @return distinct, normalized symbols (empty if the file is absent)
      * @throws ClusterException if the file exists but cannot be read
      */
     private List<String> readSeedFile() {
@@ -195,11 +182,9 @@ public class ConfigStore {
     }
 
     /**
-     * Trim and upper-case a symbol, rejecting null/blank input.
+     * Trim and uppercase a symbol, rejecting null/blank input.
      *
-     * @param symbol the raw input
-     * @return the canonical form used everywhere in ZK
-     * @throws IllegalArgumentException if the input is null or blank after trimming
+     * @throws IllegalArgumentException if null or blank after trimming
      */
     private static String normalize(String symbol) {
         if (symbol == null) {

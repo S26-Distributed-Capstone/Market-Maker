@@ -16,6 +16,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -28,23 +29,22 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * The cluster's symbol-to-node assignment engine.
+ * Symbol-to-node assignment engine.
  *
- * The Coordinator is dormant on every JVM until that JVM acquires leadership;
- * at that point it:
+ * Dormant on every JVM until leadership is acquired; once leader it:
  * <ul>
- *   <li>Seeds the symbol znode from {@code symbols.txt} if it is empty.</li>
- *   <li>Begins watching {@code /marketmaker/members} (membership churn) and
- *       {@code /marketmaker/symbols} (operator-driven symbol changes).</li>
- *   <li>On any of those triggers, debounces briefly and then writes per-node
- *       assignment znodes computed by {@link EvenSplitStrategy}.</li>
+ *   <li>Seeds the symbol znode from {@code symbols.txt} if empty.</li>
+ *   <li>Watches {@code /marketmaker/members} (membership churn) and
+ *       {@code /marketmaker/symbols} (operator-driven changes).</li>
+ *   <li>Debounces triggers, then writes per-node assignment znodes from
+ *       {@link EvenSplitStrategy}.</li>
  *   <li>Prunes assignment znodes left behind by departed nodes.</li>
  * </ul>
  *
  * Per the deployment design (dedicated leader): the leader writes itself an
- * empty assignment so it does not market-make while leading. When leadership
- * is lost, all watches are torn down, leaving the JVM free to re-enter the
- * worker pool on the next rebalance triggered by the new leader.
+ * empty assignment so it does not market-make while leading. On leadership
+ * loss all watches are torn down, so the JVM can re-enter the worker pool on
+ * the next rebalance from the new leader.
  */
 @Component
 @Profile("market-maker-node")
@@ -67,19 +67,12 @@ public class Coordinator implements ApplicationRunner {
                 return t;
             });
     private volatile ScheduledFuture<?> pendingRebalance;
+    private volatile Map<String, List<String>> lastAssignment = Map.of();
 
     private CuratorCache symbolsCache;
     private CuratorCacheListener membersListener;
     private CuratorCacheListener symbolsListener;
 
-    /**
-     * Inject all collaborators.
-     *
-     * @param curator     started Curator client (used for assignment writes / prunes)
-     * @param paths       znode-path helper
-     * @param clusterNode this JVM's cluster identity / leadership status holder
-     * @param configStore symbol-list façade (used for seeding and reads at rebalance time)
-     */
     public Coordinator(CuratorFramework curator,
                        ZkPaths paths,
                        ClusterNode clusterNode,
@@ -91,11 +84,9 @@ public class Coordinator implements ApplicationRunner {
     }
 
     /**
-     * Spring Boot startup hook. Subscribes to leadership transitions on the
-     * shared latch and immediately invokes {@link #onAcquireLeadership()} if
-     * we are already leader by the time this runs (a benign race during boot).
-     *
-     * @param args command-line arguments (unused)
+     * Subscribes to leadership transitions and invokes
+     * {@link #onAcquireLeadership()} if we're already leader on startup
+     * (a benign race during boot).
      */
     @Override
     public void run(ApplicationArguments args) {
@@ -116,18 +107,17 @@ public class Coordinator implements ApplicationRunner {
     }
 
     /**
-     * Transition this JVM into the active-leader state: seed the symbol list
-     * if needed, attach watchers for membership and symbol-list changes, and
-     * schedule the initial rebalance.
-     *
-     * Idempotent — guarded by an {@link AtomicBoolean} so duplicate
-     * notifications cannot double-install watches.
+     * Enter active-leader state: seed symbols if needed, attach watchers,
+     * and schedule the initial rebalance. Idempotent — an {@link AtomicBoolean}
+     * guards against duplicate notifications double-installing watches.
      */
     private void onAcquireLeadership() {
         if (!leading.compareAndSet(false, true)) {
             return;
         }
         log.info("node {} acquired leadership", clusterNode.getNodeId());
+
+        lastAssignment = Map.of();
 
         try {
             configStore.seedIfEmpty();
@@ -147,8 +137,8 @@ public class Coordinator implements ApplicationRunner {
     }
 
     /**
-     * Transition out of the leader state: remove watchers, close the symbols
-     * cache, and cancel any pending rebalance. Idempotent.
+     * Leave leader state: remove watchers, close the symbols cache, cancel
+     * any pending rebalance. Idempotent.
      */
     private void onLoseLeadership() {
         if (!leading.compareAndSet(true, false)) {
@@ -168,19 +158,21 @@ public class Coordinator implements ApplicationRunner {
             clusterNode.getMembersCache().listenable().removeListener(membersListener);
             membersListener = null;
         }
-        if (pendingRebalance != null) {
-            pendingRebalance.cancel(false);
-            pendingRebalance = null;
+        synchronized (this) {
+            if (pendingRebalance != null) {
+                pendingRebalance.cancel(false);
+                pendingRebalance = null;
+            }
         }
+        lastAssignment = Map.of();
     }
 
     /**
      * Coalesce a burst of triggers into a single rebalance. Cancels any
-     * previously scheduled rebalance and re-schedules one {@link #DEBOUNCE_MS}
-     * milliseconds out, so a flurry of member/symbol events runs the
-     * computation only once.
+     * pending rebalance and re-schedules {@link #DEBOUNCE_MS} ms out, so a
+     * flurry of events runs the computation only once.
      *
-     * @param reason short human-readable trigger description (logged at rebalance time)
+     * @param reason trigger description (logged at rebalance time)
      */
     private synchronized void scheduleRebalance(String reason) {
         if (!leading.get()) return;
@@ -191,15 +183,12 @@ public class Coordinator implements ApplicationRunner {
     }
 
     /**
-     * Compute the new assignment map and persist it to ZooKeeper. The leader
-     * is given an empty list (dedicated-leader mode); the remaining live
-     * members share the symbols via {@link EvenSplitStrategy#split}. Stale
-     * znodes for departed nodes are pruned at the end.
+     * Compute and persist the new assignment map. The leader gets an empty
+     * list (dedicated-leader mode); the rest share symbols via
+     * {@link EvenSplitStrategy#split}. Stale znodes are pruned at the end.
      *
-     * Failures are logged but do not propagate, so a transient ZK error does
-     * not kill the scheduler thread.
-     *
-     * @param reason short human-readable trigger description (for logging)
+     * Failures are logged but not propagated, so a transient ZK error
+     * doesn't kill the scheduler thread.
      */
     private void doRebalance(String reason) {
         if (!leading.get()) return;
@@ -219,22 +208,33 @@ public class Coordinator implements ApplicationRunner {
             log.info("rebalance ({}): leader={} workers={} symbols={} assignments={}",
                     reason, leaderId, workers, symbols, assignments);
 
-            writeAssignment(leaderId, List.of());
-            for (Map.Entry<String, List<String>> e : assignments.entrySet()) {
+            Map<String, List<String>> newAssignment = new HashMap<>(assignments);
+            newAssignment.put(leaderId, List.of());
+
+            Set<String> unchanged = EvenSplitStrategy.unchangedWorkers(lastAssignment, newAssignment);
+            int skipped = 0;
+            for (Map.Entry<String, List<String>> e : newAssignment.entrySet()) {
+                if (unchanged.contains(e.getKey())) {
+                    skipped++;
+                    continue;
+                }
                 writeAssignment(e.getKey(), e.getValue());
             }
+            if (skipped > 0) {
+                log.debug("rebalance skipped {} unchanged znodes", skipped);
+            }
+
             pruneStaleAssignments(members);
+            lastAssignment = newAssignment;
         } catch (Exception e) {
             log.error("rebalance failed ({})", reason, e);
         }
     }
 
     /**
-     * Create-or-update the per-node assignment znode with the given symbol list.
+     * Create-or-update the per-node assignment znode.
      *
-     * @param nodeId  cluster member id whose assignment is being written
-     * @param symbols the symbols this node should own
-     * @throws Exception on serialisation or ZK failure
+     * @throws Exception on serialization or ZK failure
      */
     private void writeAssignment(String nodeId, List<String> symbols) throws Exception {
         byte[] bytes = mapper.writeValueAsBytes(new ArrayList<>(symbols));
@@ -254,10 +254,10 @@ public class Coordinator implements ApplicationRunner {
     }
 
     /**
-     * Delete assignment znodes whose owner is no longer in the live member set.
-     * Tolerates races (e.g. another rebalance deleting the same node).
+     * Delete assignment znodes whose owner is no longer live. Tolerates
+     * races (e.g. another rebalance deleting the same node).
      *
-     * @param liveMembers the current live member set (anything not in here is stale)
+     * @param liveMembers current live members (anything else is stale)
      * @throws Exception on a non-ignored ZK error
      */
     private void pruneStaleAssignments(Set<String> liveMembers) throws Exception {
@@ -274,17 +274,13 @@ public class Coordinator implements ApplicationRunner {
                     curator.delete().forPath(paths.assignmentFor(id));
                     log.info("pruned stale assignment znode for dead node {}", id);
                 } catch (KeeperException.NoNodeException ignored) {
-                    // raced with another deletion
+                    // raced another deletion
                 }
             }
         }
     }
 
-    /**
-     * Spring lifecycle hook invoked at context shutdown: relinquish the
-     * leader role (closes watchers, cancels pending work) and shut down the
-     * scheduler thread.
-     */
+    /** Shutdown hook: relinquish leadership and stop the scheduler. */
     @PreDestroy
     public void shutdown() {
         onLoseLeadership();

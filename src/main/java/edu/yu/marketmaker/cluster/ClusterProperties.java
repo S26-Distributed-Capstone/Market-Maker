@@ -3,13 +3,10 @@ package edu.yu.marketmaker.cluster;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Spring {@code @ConfigurationProperties} bean carrying every operator-tunable
- * value that the cluster code reads. All settings are sourced from
- * {@code application-market-maker-node.properties} (and may be overridden by
- * environment variables, e.g. {@code ZOOKEEPER_CONNECT}).
- *
- * Defaults are picked so that the application boots cleanly inside the
- * Compose stack without requiring any explicit configuration.
+ * Operator-tunable cluster settings. Loaded from
+ * {@code application-market-maker-node.properties}, overridable via env vars
+ * (e.g. {@code ZOOKEEPER_CONNECT}). Defaults work out-of-the-box in the
+ * Compose stack.
  */
 @ConfigurationProperties(prefix = "cluster")
 public class ClusterProperties {
@@ -20,52 +17,47 @@ public class ClusterProperties {
     private int sessionTimeoutMs = 10_000;
     private int connectionTimeoutMs = 5_000;
 
-    /** @return the ZooKeeper connection string ({@code host:port[,host:port...]}). */
+    /** @return the ZK connection string ({@code host:port[,host:port...]}). */
     public String getZookeeperConnect() {
         return zookeeperConnect;
     }
 
-    /** @param zookeeperConnect the ZooKeeper connection string. */
     public void setZookeeperConnect(String zookeeperConnect) {
         this.zookeeperConnect = zookeeperConnect;
     }
 
-    /** @return the absolute znode path that the cluster roots itself under. */
+    /** @return the cluster's root znode path. */
     public String getZkBasePath() {
         return zkBasePath;
     }
 
-    /** @param zkBasePath the absolute znode path the cluster roots itself under. */
     public void setZkBasePath(String zkBasePath) {
         this.zkBasePath = zkBasePath;
     }
 
-    /** @return absolute filesystem path to the seed file used to bootstrap the symbol list. */
+    /** @return path to the symbol seed file. */
     public String getSymbolsSeedFile() {
         return symbolsSeedFile;
     }
 
-    /** @param symbolsSeedFile absolute filesystem path to the symbol seed file. */
     public void setSymbolsSeedFile(String symbolsSeedFile) {
         this.symbolsSeedFile = symbolsSeedFile;
     }
 
-    /** @return ZK session timeout in ms (controls how quickly ephemeral znodes vanish on death). */
+    /** @return ZK session timeout in ms (governs how fast ephemeral znodes expire on node death). */
     public int getSessionTimeoutMs() {
         return sessionTimeoutMs;
     }
 
-    /** @param sessionTimeoutMs ZK session timeout in ms. */
     public void setSessionTimeoutMs(int sessionTimeoutMs) {
         this.sessionTimeoutMs = sessionTimeoutMs;
     }
 
-    /** @return ZK connection (TCP) timeout in ms — distinct from the session timeout. */
+    /** @return ZK TCP connection timeout in ms (distinct from session timeout). */
     public int getConnectionTimeoutMs() {
         return connectionTimeoutMs;
     }
 
-    /** @param connectionTimeoutMs ZK connection (TCP) timeout in ms. */
     public void setConnectionTimeoutMs(int connectionTimeoutMs) {
         this.connectionTimeoutMs = connectionTimeoutMs;
     }

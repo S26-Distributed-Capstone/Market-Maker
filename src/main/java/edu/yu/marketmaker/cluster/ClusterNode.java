@@ -18,23 +18,22 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * The cluster-membership and identity primitive for a single market-maker JVM.
+ * Cluster membership and identity for a single market-maker JVM.
  *
  * On startup this bean:
  * <ol>
- *   <li>Ensures the cluster's base znodes exist in ZooKeeper.</li>
+ *   <li>Ensures the base znodes exist.</li>
  *   <li>Creates an ephemeral-sequential znode under {@code /marketmaker/members/};
- *       its short name (e.g. {@code n-0000000004}) becomes the node's
- *       cluster-wide identity for the lifetime of the JVM.</li>
- *   <li>Joins a Curator {@link LeaderLatch} so exactly one node may be elected
- *       leader at any time.</li>
- *   <li>Starts a {@link CuratorCache} over {@code /marketmaker/members} that
- *       other components (notably the Coordinator) listen to.</li>
+ *       its short name (e.g. {@code n-0000000004}) is the node's id for the
+ *       life of the JVM.</li>
+ *   <li>Joins a Curator {@link LeaderLatch} so exactly one node is leader at
+ *       any time.</li>
+ *   <li>Starts a {@link CuratorCache} over {@code /marketmaker/members} for
+ *       other components (notably the Coordinator) to listen on.</li>
  * </ol>
  *
- * Liveness is provided entirely by ZooKeeper's session-based ephemeral nodes —
- * there is no separate heartbeat scheme — so when this JVM dies, ZK reaps both
- * the member znode and the latch entry on session timeout.
+ * Liveness comes from ZK's ephemeral nodes — no separate heartbeat. When
+ * this JVM dies, ZK reaps the member znode and latch entry on session timeout.
  */
 @Component
 @Profile("market-maker-node")
@@ -50,24 +49,16 @@ public class ClusterNode implements ApplicationRunner {
     private LeaderLatch leaderLatch;
     private CuratorCache membersCache;
 
-    /**
-     * Inject the started Curator client and the path helper.
-     *
-     * @param curator started {@link CuratorFramework} client
-     * @param paths   znode-path helper for the cluster's base path
-     */
     public ClusterNode(CuratorFramework curator, ZkPaths paths) {
         this.curator = curator;
         this.paths = paths;
     }
 
     /**
-     * Spring Boot {@link ApplicationRunner} entry point. Performs the
-     * one-shot membership registration and starts the leader latch.
-     * Runs once after the application context has fully refreshed.
+     * Registers membership and starts the leader latch. Runs once after
+     * the context has fully refreshed.
      *
-     * @param args command-line arguments (unused)
-     * @throws Exception if any ZooKeeper operation fails
+     * @throws Exception if any ZK operation fails
      */
     @Override
     public void run(ApplicationArguments args) throws Exception {
@@ -91,7 +82,7 @@ public class ClusterNode implements ApplicationRunner {
     }
 
     /**
-     * @return this JVM's cluster-wide id (the ephemeral-sequential suffix assigned by ZK)
+     * @return this JVM's cluster id (the ephemeral-sequential suffix)
      * @throws IllegalStateException if called before {@link #run(ApplicationArguments)}
      */
     public String getNodeId() {
@@ -101,37 +92,34 @@ public class ClusterNode implements ApplicationRunner {
         return nodeId;
     }
 
-    /**
-     * @return {@code true} if this JVM currently holds the leader latch
-     */
+    /** @return {@code true} if this JVM holds the leader latch. */
     public boolean isLeader() {
         return leaderLatch != null && leaderLatch.hasLeadership();
     }
 
     /**
-     * @return the underlying Curator {@link LeaderLatch}, exposed so other
-     *         components can attach a {@code LeaderLatchListener} or query
-     *         participants. Never null after {@link #run(ApplicationArguments)}.
+     * @return the Curator {@link LeaderLatch} so callers can attach listeners
+     *         or query participants. Non-null after {@link #run(ApplicationArguments)}.
      */
     public LeaderLatch getLeaderLatch() {
         return leaderLatch;
     }
 
     /**
-     * @return the {@link CuratorCache} that mirrors {@code /marketmaker/members};
-     *         the Coordinator attaches a listener here to detect membership churn.
-     *         Never null after {@link #run(ApplicationArguments)}.
+     * @return the {@link CuratorCache} over {@code /marketmaker/members}; the
+     *         Coordinator attaches a listener here to detect membership churn.
+     *         Non-null after {@link #run(ApplicationArguments)}.
      */
     public CuratorCache getMembersCache() {
         return membersCache;
     }
 
     /**
-     * Read the live member set directly from ZooKeeper (bypassing the cache).
-     * Used by the Coordinator at rebalance time to get an authoritative snapshot.
+     * Read live members directly from ZK (bypassing the cache). Used by the
+     * Coordinator at rebalance time for an authoritative snapshot.
      *
-     * @return the set of live member ids, sorted lexicographically
-     * @throws ClusterException if ZooKeeper cannot be queried
+     * @return live member ids, sorted
+     * @throws ClusterException if ZK cannot be queried
      */
     public Set<String> getLiveMembers() {
         Set<String> ids = new TreeSet<>();
@@ -147,26 +135,23 @@ public class ClusterNode implements ApplicationRunner {
     }
 
     /**
-     * Idempotently create a persistent znode at {@code path} (and its parents).
-     * Tolerates concurrent creation by other nodes.
-     *
-     * @param path absolute znode path to ensure
-     * @throws Exception if a non-ignored ZK error occurs
+     * Idempotently create a persistent znode (and parents). Tolerates races
+     * with concurrent creators.
      */
     private void ensurePath(String path) throws Exception {
         if (curator.checkExists().forPath(path) == null) {
             try {
                 curator.create().creatingParentsIfNeeded().withMode(CreateMode.PERSISTENT).forPath(path);
             } catch (KeeperException.NodeExistsException ignored) {
-                // another node beat us to it; fine
+                // another node beat us to it
             }
         }
     }
 
     /**
-     * Spring lifecycle hook invoked at context shutdown. Closes the latch and
-     * the members cache, then proactively deletes our member znode so peers
-     * see us leave immediately rather than waiting for the ZK session timeout.
+     * Shutdown hook: close the latch and members cache, then proactively
+     * delete our member znode so peers see us leave immediately instead of
+     * waiting for session timeout.
      */
     @PreDestroy
     public void shutdown() {

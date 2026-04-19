@@ -1,16 +1,15 @@
 package edu.yu.marketmaker.cluster;
 
 /**
- * Centralised builder for every ZooKeeper path the cluster uses.
- * Holding all paths in one type makes the znode layout easy to audit and
- * prevents drift between the components that read and write the same nodes.
+ * Builds every ZooKeeper path the cluster uses. One type keeps the znode
+ * layout in sync across readers and writers.
  *
  * Layout under {@code base}:
  * <pre>
- *   {base}/election           — Curator LeaderLatch participants live here
+ *   {base}/election           — Curator LeaderLatch participants
  *   {base}/members            — parent of one ephemeral-sequential znode per live node
  *   {base}/members/n-XXXXX    — a single live node (id = "n-XXXXX")
- *   {base}/symbols            — persistent JSON array: the cluster-wide symbol list
+ *   {base}/symbols            — JSON array: the cluster-wide symbol list
  *   {base}/assignments        — parent of one persistent znode per node
  *   {base}/assignments/n-X    — JSON array of symbols this node should own
  * </pre>
@@ -20,8 +19,6 @@ public final class ZkPaths {
     private final String base;
 
     /**
-     * Build a ZkPaths rooted at {@code base}.
-     *
      * @param base absolute znode path (must start with '/'), e.g. "/marketmaker"
      * @throws IllegalArgumentException if base is null, blank, or not absolute
      */
@@ -37,37 +34,37 @@ public final class ZkPaths {
         return base;
     }
 
-    /** @return the LeaderLatch znode parent — Curator manages its children. */
+    /** @return the LeaderLatch parent znode. */
     public String election() {
         return base + "/election";
     }
 
-    /** @return the parent znode under which each node creates its ephemeral member entry. */
+    /** @return the parent znode for ephemeral member entries. */
     public String members() {
         return base + "/members";
     }
 
     /**
-     * @return the prefix passed to {@code create().withMode(EPHEMERAL_SEQUENTIAL).forPath(...)};
-     *         ZooKeeper appends a monotonically increasing 10-digit suffix to it.
+     * @return the prefix for EPHEMERAL_SEQUENTIAL creates; ZK appends a
+     *         10-digit suffix.
      */
     public String memberNodePrefix() {
         return members() + "/n-";
     }
 
-    /** @return the persistent znode that stores the canonical symbol list as a JSON array. */
+    /** @return the znode storing the symbol list as a JSON array. */
     public String symbols() {
         return base + "/symbols";
     }
 
-    /** @return the parent znode under which per-node assignment lists are written. */
+    /** @return the parent znode for per-node assignment lists. */
     public String assignments() {
         return base + "/assignments";
     }
 
     /**
-     * @param nodeId the cluster member id (e.g. "n-0000000003")
-     * @return the absolute znode path that holds that node's assigned symbol list
+     * @param nodeId cluster member id (e.g. "n-0000000003")
+     * @return the znode path holding that node's assigned symbols
      */
     public String assignmentFor(String nodeId) {
         return assignments() + "/" + nodeId;

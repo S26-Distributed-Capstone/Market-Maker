@@ -18,20 +18,18 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Operator-facing HTTP API for inspecting cluster state and mutating the
- * cluster's symbol list at runtime.
+ * Operator HTTP API for inspecting cluster state and editing the symbol list.
  *
  * Endpoints:
  * <ul>
- *   <li>{@code GET  /cluster/status}  — answered by every node, returns this
- *       node's view of membership, leadership, and the current symbol list.</li>
+ *   <li>{@code GET  /cluster/status} — any node; returns this node's view of
+ *       membership, leadership, and the symbol list.</li>
  *   <li>{@code POST /cluster/symbols} — leader-only; adds a symbol.</li>
- *   <li>{@code DELETE /cluster/symbols/{symbol}} — leader-only; removes a symbol.</li>
+ *   <li>{@code DELETE /cluster/symbols/{symbol}} — leader-only; removes one.</li>
  * </ul>
  *
- * Mutation endpoints called against a non-leader return HTTP 503 with an
- * {@code X-Leader} header naming the current leader's id, so an operator
- * (or a thin client wrapper) can retry against the right node.
+ * Mutations against a non-leader return 503 with an {@code X-Leader} header
+ * naming the current leader so a client can retry on the right node.
  */
 @RestController
 @RequestMapping("/cluster")
@@ -41,12 +39,6 @@ public class SymbolAdminController {
     private final ClusterNode clusterNode;
     private final ConfigStore configStore;
 
-    /**
-     * Inject the cluster identity bean and the symbol-list façade.
-     *
-     * @param clusterNode this JVM's identity / leadership status
-     * @param configStore symbol-list reader/writer backed by ZooKeeper
-     */
     public SymbolAdminController(ClusterNode clusterNode, ConfigStore configStore) {
         this.clusterNode = clusterNode;
         this.configStore = configStore;
@@ -59,10 +51,10 @@ public class SymbolAdminController {
      * Response body for {@code GET /cluster/status}.
      *
      * @param nodeId   this node's cluster id (e.g. "n-0000000003")
-     * @param leader   {@code true} if this node currently holds leadership
-     * @param leaderId id of the current leader (may be null during a transition)
-     * @param members  ids of all live cluster members at the moment of the call
-     * @param symbols  the current symbol list as stored in ZooKeeper
+     * @param leader   {@code true} if this node is the leader
+     * @param leaderId id of the current leader (null during a transition)
+     * @param members  ids of all live members at the time of the call
+     * @param symbols  current symbol list from ZK
      */
     public record StatusView(String nodeId,
                              boolean leader,
@@ -71,10 +63,8 @@ public class SymbolAdminController {
                              List<String> symbols) {}
 
     /**
-     * Snapshot the cluster state as visible from this node. Available on
-     * every node (handy for round-robin debugging).
-     *
-     * @return the current cluster status view
+     * Snapshot the cluster state as seen from this node. Available on every
+     * node (handy for round-robin debugging).
      */
     @GetMapping("/status")
     public StatusView status() {
@@ -88,12 +78,10 @@ public class SymbolAdminController {
     }
 
     /**
-     * Append a symbol to the cluster's symbol list. Must be invoked against
-     * the current leader; the resulting znode change triggers a rebalance.
+     * Append a symbol. Leader-only; the znode change triggers a rebalance.
      *
-     * @param req JSON body containing the symbol to add
-     * @return 200 with the resulting symbol list, 400 on missing symbol,
-     *         or 503 with an {@code X-Leader} header if this node is not the leader
+     * @return 200 with the new symbol list, 400 on missing symbol, or 503
+     *         with an {@code X-Leader} header if this node is not the leader
      */
     @PostMapping("/symbols")
     public ResponseEntity<?> addSymbol(@RequestBody SymbolRequest req) {
@@ -111,11 +99,9 @@ public class SymbolAdminController {
     }
 
     /**
-     * Remove a symbol from the cluster's symbol list. Must be invoked against
-     * the current leader; the resulting znode change triggers a rebalance.
+     * Remove a symbol. Leader-only; the znode change triggers a rebalance.
      *
-     * @param symbol the ticker to remove (path variable)
-     * @return 200 with the resulting symbol list, or 503 with an {@code X-Leader}
+     * @return 200 with the new symbol list, or 503 with an {@code X-Leader}
      *         header if this node is not the leader
      */
     @DeleteMapping("/symbols/{symbol}")
@@ -131,10 +117,8 @@ public class SymbolAdminController {
     }
 
     /**
-     * Guard helper for mutation endpoints.
-     *
-     * @return {@code null} if this node is the leader (caller may proceed),
-     *         or a 503 response naming the current leader otherwise
+     * @return {@code null} if this node is leader (caller may proceed), or a
+     *         503 response naming the current leader otherwise
      */
     private ResponseEntity<?> requireLeader() {
         if (clusterNode.isLeader()) return null;
@@ -149,11 +133,8 @@ public class SymbolAdminController {
     }
 
     /**
-     * Look up the current leader's participant id from the Curator
-     * {@link org.apache.curator.framework.recipes.leader.LeaderLatch}.
-     *
-     * @return the leader's id, or {@code null} if not currently determinable
-     *         (e.g. mid-failover or ZK unreachable)
+     * @return the current leader's id from the Curator LeaderLatch, or
+     *         {@code null} if indeterminate (mid-failover or ZK unreachable)
      */
     private String currentLeaderId() {
         try {
