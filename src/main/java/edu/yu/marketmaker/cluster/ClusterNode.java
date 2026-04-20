@@ -1,5 +1,6 @@
 package edu.yu.marketmaker.cluster;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.cache.CuratorCache;
@@ -8,8 +9,6 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
@@ -37,7 +36,7 @@ import java.util.TreeSet;
  */
 @Component
 @Profile("market-maker-node")
-public class ClusterNode implements ApplicationRunner {
+public class ClusterNode {
 
     private static final Logger log = LoggerFactory.getLogger(ClusterNode.class);
 
@@ -55,13 +54,16 @@ public class ClusterNode implements ApplicationRunner {
     }
 
     /**
-     * Registers membership and starts the leader latch. Runs once after
-     * the context has fully refreshed.
+     * Registers membership and starts the leader latch. Runs at bean
+     * construction time so that other beans (notably the Coordinator) can
+     * safely read {@link #getLeaderLatch()} and {@link #getMembersCache()}
+     * from their own {@code ApplicationRunner.run()} methods without racing
+     * an arbitrary Spring-driven initialization order.
      *
      * @throws Exception if any ZK operation fails
      */
-    @Override
-    public void run(ApplicationArguments args) throws Exception {
+    @PostConstruct
+    public void init() throws Exception {
         ensurePath(paths.base());
         ensurePath(paths.members());
         ensurePath(paths.assignments());
@@ -83,7 +85,7 @@ public class ClusterNode implements ApplicationRunner {
 
     /**
      * @return this JVM's cluster id (the ephemeral-sequential suffix)
-     * @throws IllegalStateException if called before {@link #run(ApplicationArguments)}
+     * @throws IllegalStateException if called before {@link #init()}
      */
     public String getNodeId() {
         if (nodeId == null) {
@@ -99,7 +101,7 @@ public class ClusterNode implements ApplicationRunner {
 
     /**
      * @return the Curator {@link LeaderLatch} so callers can attach listeners
-     *         or query participants. Non-null after {@link #run(ApplicationArguments)}.
+     *         or query participants. Non-null after {@link #init()}.
      */
     public LeaderLatch getLeaderLatch() {
         return leaderLatch;
@@ -108,7 +110,7 @@ public class ClusterNode implements ApplicationRunner {
     /**
      * @return the {@link CuratorCache} over {@code /marketmaker/members}; the
      *         Coordinator attaches a listener here to detect membership churn.
-     *         Non-null after {@link #run(ApplicationArguments)}.
+     *         Non-null after {@link #init()}.
      */
     public CuratorCache getMembersCache() {
         return membersCache;
