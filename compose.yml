@@ -1,5 +1,5 @@
 services:
-  app:
+  trading-state:
     build: .
     environment:
       - SPRING_PROFILES_ACTIVE=trading-state
@@ -79,6 +79,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=market-maker-node,test-quote-generator
       - ZOOKEEPER_CONNECT=zookeeper1:2181,zookeeper2:2181,zookeeper3:2181
+      - CLUSTER_ADVERTISE_HOST=market-maker-node-1
     ports:
       - "8081:8080"
     volumes:
@@ -99,6 +100,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=market-maker-node,test-quote-generator
       - ZOOKEEPER_CONNECT=zookeeper1:2181,zookeeper2:2181,zookeeper3:2181
+      - CLUSTER_ADVERTISE_HOST=market-maker-node-2
     ports:
       - "8082:8080"
     volumes:
@@ -119,6 +121,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=market-maker-node,test-quote-generator
       - ZOOKEEPER_CONNECT=zookeeper1:2181,zookeeper2:2181,zookeeper3:2181
+      - CLUSTER_ADVERTISE_HOST=market-maker-node-3
     ports:
       - "8083:8080"
     volumes:
@@ -139,6 +142,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=market-maker-node,test-quote-generator
       - ZOOKEEPER_CONNECT=zookeeper1:2181,zookeeper2:2181,zookeeper3:2181
+      - CLUSTER_ADVERTISE_HOST=market-maker-node-4
     ports:
       - "8084:8080"
     volumes:
@@ -159,6 +163,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=market-maker-node,test-quote-generator
       - ZOOKEEPER_CONNECT=zookeeper1:2181,zookeeper2:2181,zookeeper3:2181
+      - CLUSTER_ADVERTISE_HOST=market-maker-node-5
     ports:
       - "8085:8080"
     volumes:
@@ -179,6 +184,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=market-maker-node,test-quote-generator
       - ZOOKEEPER_CONNECT=zookeeper1:2181,zookeeper2:2181,zookeeper3:2181
+      - CLUSTER_ADVERTISE_HOST=market-maker-node-6
     ports:
       - "8086:8080"
     volumes:
@@ -199,6 +205,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=market-maker-node,test-quote-generator
       - ZOOKEEPER_CONNECT=zookeeper1:2181,zookeeper2:2181,zookeeper3:2181
+      - CLUSTER_ADVERTISE_HOST=market-maker-node-7
     ports:
       - "8087:8080"
     volumes:

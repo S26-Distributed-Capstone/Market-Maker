@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 
@@ -81,15 +82,21 @@ class ClusterIntegrationTest {
                 "compose", "build", "market-maker-node-1");
         assertEquals(0, buildRc, "docker compose build failed");
 
-        System.out.println("[IT] docker compose up -d...");
+        System.out.println("[IT] docker compose up -d (zk + postgres + trading-state)...");
+        int rcCore = runDocker(TimeUnit.MINUTES.toMillis(5),
+                "compose", "up", "-d",
+                "zookeeper1", "zookeeper2", "zookeeper3", "postgres", "trading-state");
+        assertEquals(0, rcCore, "docker compose up (core) failed");
+
+        System.out.println("[IT] waiting for trading-state health...");
+        awaitCondition(Duration.ofMinutes(2), ClusterIntegrationTest::tradingStateHealthy,
+                "trading-state not healthy within 2 minutes");
+
+        System.out.println("[IT] docker compose up -d (market-maker nodes)...");
         List<String> upCmd = new ArrayList<>(List.of("compose", "up", "-d"));
-        upCmd.add("zookeeper1");
-        upCmd.add("zookeeper2");
-        upCmd.add("zookeeper3");
-        upCmd.add("postgres");
         upCmd.addAll(PORT_TO_SERVICE.values());
         int rc = runDocker(TimeUnit.MINUTES.toMillis(5), upCmd.toArray(String[]::new));
-        assertEquals(0, rc, "docker compose up failed");
+        assertEquals(0, rc, "docker compose up (market-maker nodes) failed");
 
         System.out.println("[IT] waiting for all 7 nodes to converge (leader elected, members=7)...");
         awaitCondition(Duration.ofMinutes(4), ClusterIntegrationTest::allNodesConverged,
@@ -175,6 +182,84 @@ class ClusterIntegrationTest {
         assertTrue(!newLeader.equals(oldLeader), "new leader must differ from old");
     }
 
+    /**
+     * After failover, the new leader must subscribe to the trading-state
+     * {@code state.stream} and forward each {@link edu.yu.marketmaker.model.StateSnapshot}
+     * over TCP to the single worker that owns the symbol — fire-and-forget,
+     * with no ACK.
+     *
+     * We exercise this by posting one {@code Fill} per seed symbol to the
+     * trading-state HTTP endpoint (which broadcasts a snapshot on
+     * {@code state.stream}), then polling every surviving node's
+     * {@code /marketmaker/status} endpoint. The {@code forwardsBySymbol}
+     * counter there only increments inside {@code WorkerForwardReceiver},
+     * so a nonzero delta is direct proof that the leader forwarded to that
+     * node.
+     *
+     * Assertions:
+     * <ul>
+     *   <li>Every seed symbol lands on exactly one surviving node.</li>
+     *   <li>That node is the one the leader's assignment maps the symbol to
+     *       (per {@code /marketmaker/status}'s {@code assigned} set).</li>
+     *   <li>The new leader receives no forwards (dedicated-leader mode).</li>
+     * </ul>
+     */
+    @Test
+    @Order(3)
+    void leaderForwardsEachSymbolOverTcpToTheWorkerAssignedToIt() throws Exception {
+        Map<Integer, JsonNode> statuses = statusFromEachNode(-1);
+        assertEquals(PORT_TO_SERVICE.size() - 1, statuses.size(), "expected 6 survivors after failover");
+        String leaderId = statuses.values().iterator().next().path("leaderId").asText();
+        int leaderPort = statuses.entrySet().stream()
+                .filter(e -> leaderId.equals(e.getValue().path("nodeId").asText()))
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("no host port for new leader " + leaderId));
+        Set<Integer> survivorPorts = new TreeSet<>(statuses.keySet());
+
+        // Who owns what, according to each worker's own view.
+        Map<String, Integer> ownerPortBySymbol = assignmentOwners(survivorPorts);
+        assertEquals(SEED_SYMBOLS, ownerPortBySymbol.keySet(),
+                "every seed symbol must be assigned to some surviving worker");
+        assertTrue(!ownerPortBySymbol.containsValue(leaderPort),
+                "leader must not own any symbol; ownerPortBySymbol=" + ownerPortBySymbol);
+
+        Map<Integer, Map<String, Long>> baseline = snapshotForwardCounts(survivorPorts);
+
+        System.out.println("[IT] submitting fills for seed symbols via trading-state...");
+        for (String symbol : SEED_SYMBOLS) {
+            submitFill(symbol);
+        }
+
+        awaitCondition(Duration.ofSeconds(30), () -> {
+            Map<String, Set<Integer>> receivers = receiversBySymbol(baseline, survivorPorts);
+            if (receivers.size() != SEED_SYMBOLS.size()) return false;
+            for (Map.Entry<String, Set<Integer>> e : receivers.entrySet()) {
+                if (e.getValue().size() != 1) return false;
+                if (e.getValue().contains(leaderPort)) return false;
+            }
+            return true;
+        }, "leader did not forward each symbol to exactly one non-leader worker");
+
+        Map<String, Set<Integer>> receivers = receiversBySymbol(baseline, survivorPorts);
+        System.out.println("[IT] per-symbol forward receiver ports: " + receivers
+                + " (leaderPort=" + leaderPort + ", owners=" + ownerPortBySymbol + ")");
+
+        assertEquals(SEED_SYMBOLS, receivers.keySet(),
+                "every seed symbol must have been forwarded");
+        for (String symbol : SEED_SYMBOLS) {
+            Set<Integer> got = receivers.get(symbol);
+            assertEquals(1, got.size(),
+                    "exactly one worker should receive forwards for " + symbol + ": " + got);
+            int gotPort = got.iterator().next();
+            assertTrue(gotPort != leaderPort,
+                    "leader must receive no forwards but received " + symbol);
+            assertEquals(ownerPortBySymbol.get(symbol), (Integer) gotPort,
+                    "forward for " + symbol + " went to port " + gotPort
+                            + " but assignment owner is " + ownerPortBySymbol.get(symbol));
+        }
+    }
+
     // ---------- helpers ----------
 
     private static boolean allNodesConverged() {
@@ -202,6 +287,114 @@ class ClusterIntegrationTest {
             }
         }
         return out;
+    }
+
+    private static boolean tradingStateHealthy() {
+        try {
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create("http://localhost:8080/health"))
+                    .timeout(Duration.ofSeconds(2))
+                    .GET().build();
+            HttpResponse<String> resp = HTTP.send(req, HttpResponse.BodyHandlers.ofString());
+            return resp.statusCode() == 200;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Ask every surviving node for its own assigned symbol set, then invert
+     * into symbol -> owning port. Assignments are mutually exclusive, so
+     * each symbol maps to exactly one port.
+     */
+    private static Map<String, Integer> assignmentOwners(Set<Integer> ports) {
+        Map<String, Integer> out = new TreeMap<>();
+        for (int port : ports) {
+            JsonNode status = marketMakerStatusOrNull(port);
+            if (status == null) continue;
+            JsonNode assigned = status.path("assigned");
+            if (!assigned.isArray()) continue;
+            for (int i = 0; i < assigned.size(); i++) {
+                String symbol = assigned.get(i).asText();
+                Integer prior = out.put(symbol, port);
+                if (prior != null && prior != port) {
+                    throw new AssertionError("symbol " + symbol
+                            + " claimed by both " + prior + " and " + port);
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Snapshot per-symbol forward counts from /marketmaker/status on every port. */
+    private static Map<Integer, Map<String, Long>> snapshotForwardCounts(Set<Integer> ports) {
+        Map<Integer, Map<String, Long>> out = new LinkedHashMap<>();
+        for (int port : ports) {
+            out.put(port, forwardCountsOrEmpty(port));
+        }
+        return out;
+    }
+
+    /** For each seed symbol, the ports whose forwarded-frame count rose above {@code baseline}. */
+    private static Map<String, Set<Integer>> receiversBySymbol(
+            Map<Integer, Map<String, Long>> baseline, Set<Integer> ports) {
+        Map<String, Set<Integer>> out = new TreeMap<>();
+        for (int port : ports) {
+            Map<String, Long> now = forwardCountsOrEmpty(port);
+            Map<String, Long> before = baseline.getOrDefault(port, Map.of());
+            for (String symbol : SEED_SYMBOLS) {
+                long d = now.getOrDefault(symbol, 0L) - before.getOrDefault(symbol, 0L);
+                if (d > 0) {
+                    out.computeIfAbsent(symbol, k -> new TreeSet<>()).add(port);
+                }
+            }
+        }
+        return out;
+    }
+
+    private static Map<String, Long> forwardCountsOrEmpty(int port) {
+        JsonNode status = marketMakerStatusOrNull(port);
+        if (status == null) return Map.of();
+        JsonNode map = status.path("forwardsBySymbol");
+        if (!map.isObject()) return Map.of();
+        Map<String, Long> out = new LinkedHashMap<>();
+        map.properties().forEach(e -> out.put(e.getKey(), e.getValue().asLong()));
+        return out;
+    }
+
+    private static JsonNode marketMakerStatusOrNull(int port) {
+        try {
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create("http://localhost:" + port + "/marketmaker/status"))
+                    .timeout(Duration.ofSeconds(3))
+                    .GET().build();
+            HttpResponse<String> resp = HTTP.send(req, HttpResponse.BodyHandlers.ofString());
+            if (resp.statusCode() != 200) return null;
+            return JSON.readTree(resp.body());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static void submitFill(String symbol) throws IOException, InterruptedException {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("orderId", UUID.randomUUID().toString());
+        body.put("symbol", symbol);
+        body.put("side", "BUY");
+        body.put("quantity", 1);
+        body.put("price", 100.0);
+        body.put("quoteId", UUID.randomUUID().toString());
+        body.put("createdAt", System.currentTimeMillis());
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:8080/state/fills"))
+                .header("Content-Type", "application/json")
+                .timeout(Duration.ofSeconds(5))
+                .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body)))
+                .build();
+        HttpResponse<String> resp = HTTP.send(req, HttpResponse.BodyHandlers.ofString());
+        if (resp.statusCode() != 200) {
+            throw new IOException("POST /state/fills for " + symbol + " returned " + resp.statusCode());
+        }
     }
 
     private static JsonNode status(int port) throws IOException, InterruptedException {

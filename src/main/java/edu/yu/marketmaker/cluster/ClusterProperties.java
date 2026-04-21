@@ -16,6 +16,8 @@ public class ClusterProperties {
     private String symbolsSeedFile = "/config/symbols.txt";
     private int sessionTimeoutMs = 10_000;
     private int connectionTimeoutMs = 5_000;
+    private String advertiseHost = "localhost";
+    private int forwardPort = 7001;
 
     /** @return the ZK connection string ({@code host:port[,host:port...]}). */
     public String getZookeeperConnect() {
@@ -60,5 +62,27 @@ public class ClusterProperties {
 
     public void setConnectionTimeoutMs(int connectionTimeoutMs) {
         this.connectionTimeoutMs = connectionTimeoutMs;
+    }
+
+    /**
+     * @return hostname this node publishes so peers can open TCP forwarding
+     *         connections to it. Must be resolvable from every other node
+     *         (in Docker compose, set this to the service name).
+     */
+    public String getAdvertiseHost() {
+        return advertiseHost;
+    }
+
+    public void setAdvertiseHost(String advertiseHost) {
+        this.advertiseHost = advertiseHost;
+    }
+
+    /** @return TCP port this node's {@code WorkerForwardReceiver} listens on. */
+    public int getForwardPort() {
+        return forwardPort;
+    }
+
+    public void setForwardPort(int forwardPort) {
+        this.forwardPort = forwardPort;
     }
 }

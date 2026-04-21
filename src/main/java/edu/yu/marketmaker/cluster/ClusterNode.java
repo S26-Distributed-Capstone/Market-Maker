@@ -1,5 +1,7 @@
 package edu.yu.marketmaker.cluster;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.apache.curator.framework.CuratorFramework;
@@ -13,6 +15,8 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -42,15 +46,18 @@ public class ClusterNode {
 
     private final CuratorFramework curator;
     private final ZkPaths paths;
+    private final ClusterProperties props;
+    private final ObjectMapper mapper = new ObjectMapper();
 
     private volatile String nodeId;
     private volatile String memberZnodePath;
     private LeaderLatch leaderLatch;
     private CuratorCache membersCache;
 
-    public ClusterNode(CuratorFramework curator, ZkPaths paths) {
+    public ClusterNode(CuratorFramework curator, ZkPaths paths, ClusterProperties props) {
         this.curator = curator;
         this.paths = paths;
+        this.props = props;
     }
 
     /**
@@ -68,10 +75,13 @@ public class ClusterNode {
         ensurePath(paths.members());
         ensurePath(paths.assignments());
 
+        byte[] memberData = mapper.writeValueAsBytes(Map.of(
+                "host", props.getAdvertiseHost(),
+                "forwardPort", props.getForwardPort()));
         this.memberZnodePath = curator.create()
                 .creatingParentsIfNeeded()
                 .withMode(CreateMode.EPHEMERAL_SEQUENTIAL)
-                .forPath(paths.memberNodePrefix(), new byte[0]);
+                .forPath(paths.memberNodePrefix(), memberData);
         this.nodeId = memberZnodePath.substring(memberZnodePath.lastIndexOf('/') + 1);
         log.info("registered cluster member id={} at {}", nodeId, memberZnodePath);
 
@@ -134,6 +144,28 @@ public class ClusterNode {
             throw new ClusterException("failed to list members", e);
         }
         return ids;
+    }
+
+    /**
+     * Look up the forwarding endpoint that peer {@code nodeId} advertised in
+     * its member znode. Returns empty if the node is gone or its payload is
+     * unreadable (e.g. legacy empty payload).
+     */
+    public Optional<ForwardEndpoint> forwardEndpointOf(String nodeId) {
+        try {
+            byte[] data = curator.getData().forPath(paths.members() + "/" + nodeId);
+            if (data == null || data.length == 0) return Optional.empty();
+            JsonNode json = mapper.readTree(data);
+            JsonNode host = json.get("host");
+            JsonNode port = json.get("forwardPort");
+            if (host == null || port == null) return Optional.empty();
+            return Optional.of(new ForwardEndpoint(host.asText(), port.asInt()));
+        } catch (KeeperException.NoNodeException e) {
+            return Optional.empty();
+        } catch (Exception e) {
+            log.warn("failed to read forward endpoint for {}: {}", nodeId, e.toString());
+            return Optional.empty();
+        }
     }
 
     /**
