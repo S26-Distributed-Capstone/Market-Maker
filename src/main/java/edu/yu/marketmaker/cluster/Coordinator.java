@@ -62,6 +62,7 @@ public class Coordinator implements ApplicationRunner {
             });
     private volatile ScheduledFuture<?> pendingRebalance;
     private volatile Map<String, List<String>> lastAssignment = Map.of();
+    private volatile boolean forceFullWrite = false;
 
     private CuratorCache symbolsCache;
     private CuratorCacheListener membersListener;
@@ -112,6 +113,7 @@ public class Coordinator implements ApplicationRunner {
         log.info("node {} acquired leadership", clusterNode.getNodeId());
 
         lastAssignment = Map.of();
+        forceFullWrite = true;
 
         try {
             configStore.seedIfEmpty();
@@ -205,7 +207,11 @@ public class Coordinator implements ApplicationRunner {
             Map<String, List<String>> newAssignment = new HashMap<>(assignments);
             newAssignment.put(leaderId, List.of());
 
-            Set<String> unchanged = EvenSplitStrategy.unchangedWorkers(lastAssignment, newAssignment);
+            boolean fullWrite = forceFullWrite;
+            forceFullWrite = false;
+            Set<String> unchanged = fullWrite
+                    ? Set.of()
+                    : EvenSplitStrategy.unchangedWorkers(lastAssignment, newAssignment);
             int skipped = 0;
             for (Map.Entry<String, List<String>> e : newAssignment.entrySet()) {
                 if (unchanged.contains(e.getKey())) {

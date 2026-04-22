@@ -1,5 +1,6 @@
 package edu.yu.marketmaker.cluster;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.yu.marketmaker.marketmaker.MarketMaker;
 import edu.yu.marketmaker.model.StateSnapshot;
@@ -39,7 +40,8 @@ public class WorkerForwardReceiver {
 
     private final int port;
     private final MarketMaker marketMaker;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private final AtomicBoolean running = new AtomicBoolean(false);
     private ServerSocket serverSocket;

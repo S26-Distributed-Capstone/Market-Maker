@@ -217,29 +217,37 @@ class ClusterIntegrationTest {
                 .orElseThrow(() -> new AssertionError("no host port for new leader " + leaderId));
         Set<Integer> survivorPorts = new TreeSet<>(statuses.keySet());
 
-        // Who owns what, according to each worker's own view.
-        Map<String, Integer> ownerPortBySymbol = assignmentOwners(survivorPorts);
-        assertEquals(SEED_SYMBOLS, ownerPortBySymbol.keySet(),
-                "every seed symbol must be assigned to some surviving worker");
-        assertTrue(!ownerPortBySymbol.containsValue(leaderPort),
-                "leader must not own any symbol; ownerPortBySymbol=" + ownerPortBySymbol);
+        // Who owns what, according to each worker's own view. After failover
+        // the coordinator rebalances znode-by-znode, so a symbol may be
+        // momentarily claimed by its old and new owner simultaneously —
+        // poll until the per-node assigned sets are mutually exclusive,
+        // cover every seed symbol, and exclude the new leader.
+        Map<String, Integer> ownerPortBySymbol = awaitStableAssignmentOwners(
+                survivorPorts, leaderPort, Duration.ofSeconds(60));
 
         Map<Integer, Map<String, Long>> baseline = snapshotForwardCounts(survivorPorts);
 
+        // Re-submit fills in a loop: the new leader's LeaderForwarder may not
+        // have finished its state.stream subscription by the time the first
+        // fill lands on trading-state. Each resubmit bumps the position
+        // version, producing a fresh emission for any subscriber that has
+        // since attached.
         System.out.println("[IT] submitting fills for seed symbols via trading-state...");
-        for (String symbol : SEED_SYMBOLS) {
-            submitFill(symbol);
-        }
-
-        awaitCondition(Duration.ofSeconds(30), () -> {
-            Map<String, Set<Integer>> receivers = receiversBySymbol(baseline, survivorPorts);
-            if (receivers.size() != SEED_SYMBOLS.size()) return false;
-            for (Map.Entry<String, Set<Integer>> e : receivers.entrySet()) {
-                if (e.getValue().size() != 1) return false;
-                if (e.getValue().contains(leaderPort)) return false;
+        Instant deadline = Instant.now().plus(Duration.ofSeconds(60));
+        boolean ok = false;
+        while (Instant.now().isBefore(deadline)) {
+            for (String symbol : SEED_SYMBOLS) {
+                submitFill(symbol);
             }
-            return true;
-        }, "leader did not forward each symbol to exactly one non-leader worker");
+            Map<String, Set<Integer>> receivers = receiversBySymbol(baseline, survivorPorts);
+            if (receivers.size() == SEED_SYMBOLS.size()
+                    && receivers.values().stream().allMatch(s -> s.size() == 1 && !s.contains(leaderPort))) {
+                ok = true;
+                break;
+            }
+            Thread.sleep(1000);
+        }
+        assertTrue(ok, "leader did not forward each symbol to exactly one non-leader worker");
 
         Map<String, Set<Integer>> receivers = receiversBySymbol(baseline, survivorPorts);
         System.out.println("[IT] per-symbol forward receiver ports: " + receivers
@@ -292,7 +300,7 @@ class ClusterIntegrationTest {
     private static boolean tradingStateHealthy() {
         try {
             HttpRequest req = HttpRequest.newBuilder()
-                    .uri(URI.create("http://localhost:8080/health"))
+                    .uri(URI.create("http://localhost:18080/health"))
                     .timeout(Duration.ofSeconds(2))
                     .GET().build();
             HttpResponse<String> resp = HTTP.send(req, HttpResponse.BodyHandlers.ofString());
@@ -304,26 +312,53 @@ class ClusterIntegrationTest {
 
     /**
      * Ask every surviving node for its own assigned symbol set, then invert
-     * into symbol -> owning port. Assignments are mutually exclusive, so
-     * each symbol maps to exactly one port.
+     * into symbol -> owning port. Returns null if the view is inconsistent
+     * (a symbol claimed by two workers) — used by
+     * {@link #awaitStableAssignmentOwners} to retry until the rebalance
+     * settles.
      */
-    private static Map<String, Integer> assignmentOwners(Set<Integer> ports) {
+    private static Map<String, Integer> assignmentOwnersOrNull(Set<Integer> ports) {
         Map<String, Integer> out = new TreeMap<>();
         for (int port : ports) {
             JsonNode status = marketMakerStatusOrNull(port);
-            if (status == null) continue;
+            if (status == null) return null;
             JsonNode assigned = status.path("assigned");
-            if (!assigned.isArray()) continue;
+            if (!assigned.isArray()) return null;
             for (int i = 0; i < assigned.size(); i++) {
                 String symbol = assigned.get(i).asText();
                 Integer prior = out.put(symbol, port);
                 if (prior != null && prior != port) {
-                    throw new AssertionError("symbol " + symbol
-                            + " claimed by both " + prior + " and " + port);
+                    return null;
                 }
             }
         }
         return out;
+    }
+
+    /**
+     * Poll {@code /marketmaker/status} across all survivors until their
+     * assigned sets form a valid partition of {@link #SEED_SYMBOLS} and
+     * exclude {@code leaderPort}.
+     */
+    private static Map<String, Integer> awaitStableAssignmentOwners(
+            Set<Integer> survivorPorts, int leaderPort, Duration timeout) {
+        Instant deadline = Instant.now().plus(timeout);
+        Map<String, Integer> last = null;
+        while (Instant.now().isBefore(deadline)) {
+            Map<String, Integer> owners = assignmentOwnersOrNull(survivorPorts);
+            last = owners;
+            if (owners != null
+                    && owners.keySet().equals(SEED_SYMBOLS)
+                    && !owners.containsValue(leaderPort)) {
+                return owners;
+            }
+            try { Thread.sleep(500); } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        throw new AssertionError("assignment did not stabilize within "
+                + timeout + "; last view=" + last);
     }
 
     /** Snapshot per-symbol forward counts from /marketmaker/status on every port. */
@@ -385,16 +420,25 @@ class ClusterIntegrationTest {
         body.put("price", 100.0);
         body.put("quoteId", UUID.randomUUID().toString());
         body.put("createdAt", System.currentTimeMillis());
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create("http://localhost:8080/state/fills"))
-                .header("Content-Type", "application/json")
-                .timeout(Duration.ofSeconds(5))
-                .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body)))
-                .build();
-        HttpResponse<String> resp = HTTP.send(req, HttpResponse.BodyHandlers.ofString());
-        if (resp.statusCode() != 200) {
-            throw new IOException("POST /state/fills for " + symbol + " returned " + resp.statusCode());
+        String json = JSON.writeValueAsString(body);
+        IOException last = null;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                HttpRequest req = HttpRequest.newBuilder()
+                        .uri(URI.create("http://localhost:18080/state/fills"))
+                        .header("Content-Type", "application/json")
+                        .timeout(Duration.ofSeconds(30))
+                        .POST(HttpRequest.BodyPublishers.ofString(json))
+                        .build();
+                HttpResponse<String> resp = HTTP.send(req, HttpResponse.BodyHandlers.ofString());
+                if (resp.statusCode() == 200) return;
+                last = new IOException("POST /state/fills for " + symbol + " returned " + resp.statusCode());
+            } catch (java.net.http.HttpTimeoutException e) {
+                last = new IOException("POST /state/fills for " + symbol + " timed out (attempt " + attempt + ")", e);
+            }
+            Thread.sleep(500);
         }
+        throw last;
     }
 
     private static JsonNode status(int port) throws IOException, InterruptedException {

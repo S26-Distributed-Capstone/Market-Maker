@@ -5,7 +5,7 @@ services:
       - SPRING_PROFILES_ACTIVE=trading-state
     image: market-maker
     ports:
-      - "8080:8080"
+      - "18080:8080"
       - "7000:7000"
     depends_on:
       postgres:
