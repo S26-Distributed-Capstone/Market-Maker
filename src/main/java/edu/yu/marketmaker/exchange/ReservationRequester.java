@@ -1,20 +1,21 @@
 package edu.yu.marketmaker.exchange;
 
-import org.springframework.messaging.rsocket.RSocketRequester;
+import edu.yu.marketmaker.ha.LeaderAwareRSocketClient;
+import edu.yu.marketmaker.model.Quote;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-import edu.yu.marketmaker.model.Quote;
-
 @Component
+@Profile("exchange")
 public class ReservationRequester {
-    
-    private final RSocketRequester requester;
 
-    public ReservationRequester(RSocketRequester.Builder builder) {
-        this.requester = builder.tcp("exposure-reservation", 7000);
+    private final LeaderAwareRSocketClient client;
+
+    public ReservationRequester(LeaderAwareRSocketClient client) {
+        this.client = client;
     }
 
     public void sendReservation(Quote quote) {
-        requester.route("reservations").data(quote).send().subscribe();
+        client.send("exposure-reservation", "reservations", quote);
     }
 }

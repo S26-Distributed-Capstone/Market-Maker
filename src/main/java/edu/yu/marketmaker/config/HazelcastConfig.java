@@ -11,6 +11,7 @@ import edu.yu.marketmaker.exposurereservation.ExposureReservationService;
 import edu.yu.marketmaker.persistence.*;
 import edu.yu.marketmaker.persistence.interfaces.*;
 import org.springframework.context.annotation.*;
+import com.hazelcast.config.TcpIpConfig;
 
 import java.util.UUID;
 
@@ -152,15 +153,24 @@ public class HazelcastConfig {
      * Network configuration for Hazelcast Nodes
      * @param config config object to be used for parameters of Hazelcast
      */
-    private void configureNetwork(Config config) {
-        NetworkConfig networkConfig = config.getNetworkConfig();
+private void configureNetwork(Config config) {
+    NetworkConfig networkConfig = config.getNetworkConfig();
+    JoinConfig joinConfig = networkConfig.getJoin();
+    joinConfig.getMulticastConfig().setEnabled(false);
 
-        // Join configuration - using multicast for development
-        // For production, consider TCP-IP or Kubernetes discovery
-        JoinConfig joinConfig = networkConfig.getJoin();
-        joinConfig.getMulticastConfig().setEnabled(true);
-        joinConfig.getTcpIpConfig().setEnabled(false);
-    }
+    // TCP-IP discovery using docker DNS.
+    // Each service-name resolves to ALL replica IPs inside the compose network.
+    // Hazelcast will try each until it finds another cluster member.
+    TcpIpConfig tcpConfig = joinConfig.getTcpIpConfig();
+    tcpConfig.setEnabled(true);
+    tcpConfig.addMember("trading-state");
+    tcpConfig.addMember("exchange");
+    tcpConfig.addMember("exposure-reservation");
+    tcpConfig.addMember("position-ui");
+
+    // Bind to all interfaces so other members can connect to this JVM
+    networkConfig.getInterfaces().setEnabled(false);
+}
 
     // --- IMap Beans for Dependency Injection ---
 

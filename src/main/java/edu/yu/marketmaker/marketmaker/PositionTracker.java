@@ -1,21 +1,29 @@
 package edu.yu.marketmaker.marketmaker;
 
-import org.springframework.messaging.rsocket.RSocketRequester;
-import org.springframework.stereotype.Component;
-
+import edu.yu.marketmaker.ha.LeaderAwareRSocketClient;
 import edu.yu.marketmaker.model.StateSnapshot;
+import org.springframework.context.annotation.Profile;
+import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
-@Component
-public class PositionTracker {
-    
-    private final RSocketRequester requester;
+import java.time.Duration;
 
-    public PositionTracker(RSocketRequester.Builder rsocketRequesterBuilder) {
-        this.requester = rsocketRequesterBuilder.tcp("trading-state", 7000);
+@Component
+@Profile("market-maker-node")
+public class PositionTracker {
+
+    private final LeaderAwareRSocketClient client;
+
+    public PositionTracker(LeaderAwareRSocketClient client) {
+        this.client = client;
     }
 
     public Flux<StateSnapshot> getPositions() {
-        return requester.route("state.stream").retrieveFlux(StateSnapshot.class);
+        // .repeatWhen reconnects on leader change: if the current leader dies,
+        // the stream errors, we resume with empty, then repeat (which re-resolves
+        // the leader via the registry cache).
+        return client.requestStream("trading-state", "state.stream", StateSnapshot.class)
+                .onErrorResume(e -> Flux.empty())
+                .repeatWhen(signals -> signals.delayElements(Duration.ofSeconds(2)));
     }
 }
