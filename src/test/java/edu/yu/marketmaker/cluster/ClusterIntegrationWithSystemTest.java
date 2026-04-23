@@ -1,8 +1,11 @@
 package edu.yu.marketmaker.cluster;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.yu.marketmaker.model.Fill;
+import edu.yu.marketmaker.model.Side;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -33,6 +36,8 @@ import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -205,6 +210,43 @@ class ClusterIntegrationWithSystemTest {
                         + "is not in the bootstrap set; proves a market-maker wrote a quote "
                         + "back via the shared Hazelcast quotes map. bootstrap ids="
                         + bootstrapQuoteIds);
+
+        List<Fill> allFills = getAllFills();
+        assertFalse(allFills.isEmpty(), "trading-state /state/fills returned no fills");
+
+        Set<String> symbolsSeenInFills = new TreeSet<>();
+        Map<String, Long> signedNetBySymbolFromFills = new TreeMap<>();
+        Set<UUID> quoteIdsSeenInFills = new HashSet<>();
+        for (Fill fill : allFills) {
+            assertNotNull(fill.orderId(), "fill orderId must be present: " + fill);
+            assertTrue(SEED_SYMBOLS.contains(fill.symbol()),
+                    "fill symbol must be one of seed symbols: " + fill.symbol());
+            assertNotNull(fill.side(), "fill side must be present: " + fill);
+            assertTrue(fill.quantity() > 0, "fill quantity must be > 0: " + fill);
+            assertTrue(fill.price() > 0.0, "fill price must be > 0: " + fill);
+            assertNotNull(fill.quoteId(), "fill quoteId must be present: " + fill);
+            assertTrue(fill.createdAt() > 0, "fill createdAt must be positive: " + fill);
+
+            if (fill.side() == Side.BUY) {
+                assertTrue(fill.price() >= 99.0,
+                        "BUY fills must execute at/beyond the SELL limit (>=99.0): " + fill);
+            } else {
+                assertTrue(fill.price() <= 101.0,
+                        "SELL fills must execute at/below the BUY limit (<=101.0): " + fill);
+            }
+
+            symbolsSeenInFills.add(fill.symbol());
+            quoteIdsSeenInFills.add(fill.quoteId());
+            long signed = fill.side() == Side.BUY ? fill.quantity() : -fill.quantity();
+            signedNetBySymbolFromFills.merge(fill.symbol(), signed, Long::sum);
+        }
+
+        assertEquals(SEED_SYMBOLS, symbolsSeenInFills,
+                "every seed symbol must appear in /state/fills at least once");
+        assertEquals(SEED_SYMBOLS, signedNetBySymbolFromFills.keySet(),
+                "net position must be derivable from fills for every seed symbol");
+        assertTrue(quoteIdsSeenInFills.stream().anyMatch(id -> !bootstrapQuoteIds.contains(id)),
+                "fills should include at least one market-maker quoteId not in bootstrap set");
     }
 
     // ---------- helpers ----------
@@ -327,6 +369,21 @@ class ClusterIntegrationWithSystemTest {
             fail("submit-orders returned " + resp.statusCode() + ": " + resp.body());
         }
         return Integer.parseInt(resp.body().trim());
+    }
+
+    private static List<Fill> getAllFills() throws Exception {
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:" + TRADING_STATE_PORT + "/state/fills"))
+                .timeout(Duration.ofSeconds(10))
+                .GET().build();
+        HttpResponse<String> resp = HTTP.send(req, HttpResponse.BodyHandlers.ofString());
+        if (resp.statusCode() != 200) {
+            fail("GET /state/fills returned " + resp.statusCode() + ": " + resp.body());
+        }
+        // /state/fills may include storage-level metadata fields (e.g. "id").
+        return JSON.copy()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                .readValue(resp.body(), new TypeReference<List<Fill>>() {});
     }
 
     private static boolean hasNonZeroPosition(String symbol) {
